@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearSession, type Session } from "@/lib/auth";
 import { colorForIndex, hexToRgba } from "@/lib/colors";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 /*
   Left sidebar. Only "Home" exists to start with — everything else is the roadmap
@@ -19,7 +21,8 @@ const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/invoices", label: "Sales Invoices", built: true },
   { href: "/receipts", label: "Receipt Entry", built: false },
   { href: "/upload", label: "Upload Report", built: true },
-  { href: "/reminders", label: "AR Followup", built: false },
+  { href: "/reminders", label: "Reminder Template", built: true },
+  { href: "/reminders/auto-shoot", label: "Auto Email Shoot", built: true },
   { href: "/reports/statement", label: "Customer Statement", built: false },
   { href: "/reports/ageing", label: "AR Ageing", built: true },
   { href: "/cashflow", label: "Cashflow Projection", built: false },
@@ -31,58 +34,122 @@ const HEADER_GRADIENT = `linear-gradient(135deg, ${hexToRgba(colorForIndex(0), 0
   0.1
 )}, ${hexToRgba(colorForIndex(4), 0.1)}, ${hexToRgba(colorForIndex(6), 0.1)})`;
 
+const COLLAPSE_KEY = "ar-manager-nav-collapsed";
+
+function initials(label: string) {
+  return label
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
 export function Nav({ session }: { session: Session }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "true");
+  }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem(COLLAPSE_KEY, String(next));
+  }
+
+  function handleSignOut() {
+    clearSession();
+    window.location.href = "/";
+  }
 
   return (
-    <nav className="no-print flex h-full w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
-      <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5" style={{ background: HEADER_GRADIENT }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-12 w-auto" />
-        <h1 className="mt-2 text-xl font-bold text-slate-900">AR Manager</h1>
+    <nav
+      className={`no-print flex h-full flex-col border-r border-slate-200 bg-white transition-[width] dark:border-slate-800 dark:bg-slate-900 ${
+        collapsed ? "w-16" : "w-60"
+      }`}
+    >
+      <div className="flex-1 overflow-y-auto p-4">
+        {collapsed ? (
+          <p className="mb-4 px-2 text-sm font-bold text-brand">V</p>
+        ) : (
+          <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5" style={{ background: HEADER_GRADIENT }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-12 w-auto" />
+            <h1 className="mt-2 text-xl font-bold text-slate-900 dark:text-white">AR Manager</h1>
+          </div>
+        )}
+        <div className="flex flex-col gap-1">
+          {LINKS.map((l, i) => {
+            const active = pathname === l.href;
+            if (!l.built) {
+              return (
+                <span
+                  key={l.href}
+                  title={l.label}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-base text-slate-400 dark:text-slate-600"
+                >
+                  {collapsed ? initials(l.label) : l.label}
+                  {!collapsed && (
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                      build me
+                    </span>
+                  )}
+                </span>
+              );
+            }
+            const accent = colorForIndex(i);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                title={l.label}
+                style={
+                  active || collapsed
+                    ? undefined
+                    : { borderLeft: `3px solid ${accent}`, backgroundColor: hexToRgba(accent, 0.05) }
+                }
+                className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
+                  active
+                    ? "bg-brand text-white"
+                    : "text-slate-900 hover:brightness-95 dark:text-slate-100 dark:hover:brightness-125"
+                }`}
+              >
+                {collapsed ? initials(l.label) : l.label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
-      {LINKS.map((l, i) => {
-        const active = pathname === l.href;
-        if (!l.built) {
-          return (
-            <span
-              key={l.href}
-              className="flex items-center justify-between rounded-lg px-3 py-2 text-base text-slate-400"
-            >
-              {l.label}
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                build me
-              </span>
-            </span>
-          );
-        }
-        const accent = colorForIndex(i);
-        return (
-          <Link
-            key={l.href}
-            href={l.href}
-            style={active ? undefined : { borderLeft: `3px solid ${accent}`, backgroundColor: hexToRgba(accent, 0.05) }}
-            className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
-              active ? "bg-brand text-white" : "text-slate-900 hover:brightness-95"
-            }`}
-          >
-            {l.label}
-          </Link>
-        );
-      })}
-
-      <div className="mt-auto border-t border-slate-200 pt-3">
-        <p className="truncate px-2 text-base font-medium text-slate-700">{session.name}</p>
-        <p className="truncate px-2 text-sm text-slate-400">{session.email}</p>
+      <div className="flex flex-none flex-col gap-2 border-t border-slate-200 p-4 dark:border-slate-800">
+        {!collapsed && (
+          <div className="px-1 pb-1">
+            <p className="truncate text-base font-medium text-slate-700 dark:text-slate-200">
+              {session.name}
+            </p>
+            <p className="truncate text-sm text-slate-400 dark:text-slate-500">{session.email}</p>
+          </div>
+        )}
+        <ThemeToggle collapsed={collapsed} />
         <button
-          type="button"
-          onClick={() => {
-            clearSession();
-            window.location.href = "/";
-          }}
-          className="mt-2 w-full rounded-lg px-3 py-2 text-left text-base font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          onClick={toggleCollapsed}
+          title={collapsed ? "Expand" : "Collapse"}
+          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${
+            collapsed ? "justify-center" : "gap-2"
+          }`}
         >
-          Sign out
+          <span aria-hidden>{collapsed ? "›" : "‹"}</span>
+          {!collapsed && "Collapse"}
+        </button>
+        <button
+          onClick={handleSignOut}
+          title="Sign out"
+          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${
+            collapsed ? "justify-center" : "gap-2"
+          }`}
+        >
+          {collapsed ? "S" : "Sign out"}
         </button>
       </div>
     </nav>

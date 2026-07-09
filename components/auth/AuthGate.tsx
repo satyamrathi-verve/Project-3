@@ -28,7 +28,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen">
       <Nav session={session} />
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto bg-slate-50 p-8 dark:bg-slate-950">{children}</main>
     </div>
   );
 }

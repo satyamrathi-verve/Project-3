@@ -46,11 +46,11 @@ export function DataTable<T extends { id: string }>({
   const table = (
     <table className="w-full text-sm">
       <thead>
-        <tr className="border-b-2 border-brand/30 bg-brand/10 text-left">
+        <tr className="border-b-2 border-brand/30 bg-brand/10 text-left dark:border-brand/40 dark:bg-brand/20">
           {columns.map((c) => (
             <th
               key={c.key}
-              className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark ${c.className ?? ""}`}
+              className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-blue-300 ${c.className ?? ""}`}
               style={
                 c.accentColor
                   ? { backgroundColor: hexToRgba(c.accentColor, 0.16), borderBottom: `2px solid ${c.accentColor}` }
@@ -65,7 +65,7 @@ export function DataTable<T extends { id: string }>({
       <tbody>
         {rows.length === 0 ? (
           <tr>
-            <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-400">
+            <td colSpan={columns.length} className="px-4 py-10 text-center text-slate-400 dark:text-slate-600">
               {empty}
             </td>
           </tr>
@@ -74,14 +74,14 @@ export function DataTable<T extends { id: string }>({
             <tr
               key={row.id}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={`border-b border-slate-100 last:border-0 transition-colors hover:bg-brand/5 ${
-                i % 2 === 1 ? "bg-slate-50/70" : ""
+              className={`border-b border-slate-100 last:border-0 transition-colors hover:bg-brand/5 dark:border-slate-800 dark:hover:bg-slate-800 ${
+                i % 2 === 1 ? "bg-slate-50/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
               } ${onRowClick ? "cursor-pointer" : ""} ${rowClassName?.(row) ?? ""}`}
             >
               {columns.map((c) => (
                 <td
                   key={c.key}
-                  className={`whitespace-nowrap px-4 py-3 text-slate-700 ${c.className ?? ""}`}
+                  className={`whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-300 ${c.className ?? ""}`}
                   style={c.accentColor ? { backgroundColor: hexToRgba(c.accentColor, 0.07) } : undefined}
                 >
                   {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "")}
@@ -97,5 +97,9 @@ export function DataTable<T extends { id: string }>({
 
   if (bare) return table;
 
-  return <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">{table}</div>;
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      {table}
+    </div>
+  );
 }
