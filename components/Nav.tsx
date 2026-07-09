@@ -52,7 +52,7 @@ export function Nav({ session }: { session: Session }) {
         </div>
       </div>
 
-      <div className="relative z-10 flex-1 overflow-y-auto p-4">
+      <div className="nav-scroll relative z-10 flex-1 overflow-y-auto p-4">
         <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-16 w-auto brightness-0 invert" />

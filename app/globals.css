@@ -25,6 +25,30 @@ body {
   color: #7fa6f0;
 }
 
+/*
+  The sidebar sits on a dark navy background, but the page's color-scheme is
+  "light", so the browser draws its default (dark) scrollbar thumb there —
+  reads as a stray black bar. Force a light thumb for this one scrollable
+  area instead of switching the whole page to a dark color-scheme.
+*/
+.nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+.nav-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.nav-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.nav-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.35);
+  border-radius: 9999px;
+}
+.nav-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.55);
+}
+
 @keyframes bar-rise {
   from {
     transform: scaleY(0);
