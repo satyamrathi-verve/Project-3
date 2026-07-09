@@ -43,6 +43,7 @@ body {
   main {
     overflow: visible !important;
     height: auto !important;
+    padding: 0 !important;
   }
   .print-scroll {
     min-height: 0 !important;
