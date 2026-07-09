@@ -15,7 +15,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${className}`}>
+    <div className={`rounded-2xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow hover:shadow-md ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -38,7 +38,7 @@ const TONE_STYLES: Record<KpiTone, { ring: string; text: string; bg: string }> =
   orange: { ring: "ring-orange-100", text: "text-orange-600", bg: "bg-orange-50" },
   red: { ring: "ring-red-100", text: "text-red-600", bg: "bg-red-50" },
   purple: { ring: "ring-purple-100", text: "text-purple-600", bg: "bg-purple-50" },
-  slate: { ring: "ring-slate-100", text: "text-slate-600", bg: "bg-slate-50" },
+  slate: { ring: "ring-slate-100", text: "text-slate-600", bg: "bg-cream-dim" },
 };
 
 export function KpiCard({
@@ -62,7 +62,7 @@ export function KpiCard({
     <Comp
       onClick={onClick}
       type={onClick ? "button" : undefined}
-      className={`flex w-full flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm ring-1 ring-transparent transition-all ${
+      className={`flex w-full flex-col gap-2 rounded-2xl border border-slate-200 bg-cream p-4 text-left shadow-sm ring-1 ring-transparent transition-all ${
         onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:" + t.ring : ""
       }`}
     >
@@ -104,7 +104,7 @@ export function Skeleton({ className = "h-4 w-full" }: { className?: string }) {
 
 export function EmptyState({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-cream-dim/50 px-6 py-10 text-center">
       <p className="text-sm font-medium text-slate-500">{title}</p>
       {note && <p className="mt-1 max-w-sm text-xs text-slate-400">{note}</p>}
     </div>
@@ -115,7 +115,7 @@ export function LoadingGrid() {
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
       {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div key={i} className="rounded-2xl border border-slate-200 bg-cream p-4">
           <Skeleton className="mb-3 h-3 w-2/3" />
           <Skeleton className="h-6 w-1/2" />
         </div>

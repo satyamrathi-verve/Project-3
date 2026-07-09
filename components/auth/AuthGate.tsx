@@ -30,7 +30,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       <div className="print:hidden">
         <Nav session={session} />
       </div>
-      <main className="flex-1 overflow-y-auto bg-slate-50 p-8 dark:bg-slate-950 print:w-full print:overflow-visible print:bg-white print:p-0">
+      <main className="flex-1 overflow-y-auto bg-cream-dim p-8 dark:bg-slate-950 print:w-full print:overflow-visible print:bg-cream print:p-0">
         {children}
       </main>
     </div>

@@ -47,7 +47,7 @@ export function SearchableSelect({
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
       {open && (
-        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-slate-200 bg-cream shadow-lg dark:border-slate-700 dark:bg-slate-800">
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
@@ -55,7 +55,7 @@ export function SearchableSelect({
               onChange("");
               setOpen(false);
             }}
-            className="block w-full px-3 py-2 text-left text-sm text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700"
+            className="block w-full px-3 py-2 text-left text-sm text-slate-400 hover:bg-cream-dim dark:hover:bg-slate-700"
           >
             {emptyLabel}
           </button>
@@ -71,7 +71,7 @@ export function SearchableSelect({
                   onChange(o.value);
                   setOpen(false);
                 }}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-cream-dim dark:hover:bg-slate-700 ${
                   o.value === value ? "bg-brand/10 font-medium text-brand" : "text-slate-700 dark:text-slate-200"
                 }`}
               >

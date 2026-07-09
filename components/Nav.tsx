@@ -1,25 +1,17 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { clearSession, type Session } from "@/lib/auth";
-import { colorForIndex, hexToRgba } from "@/lib/colors";
 import { AR360Logo } from "@/components/AR360Logo";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { FinanceIcon, ledgerGridPath, calculatorPath, invoicePath } from "@/components/decor/financeIcons";
+import { SignOutIcon } from "@/components/icons";
 
 /*
   Left sidebar. Only "Home" exists to start with — everything else is the roadmap
   your team builds. Each unbuilt screen shows a "build me" tag. When you finish a
   screen, flip its `built` to true (and point `href` at the route you created) so it
   turns into a real link.
-
-  Auto-hide: the sidebar rests as a slim icon rail and expands on hover (a
-  slim rail rather than sliding fully off-screen, so there's always a visible,
-  reachable strip to hover back onto — hiding completely would mean the user
-  has to remember an invisible edge to trigger it). "Pin open" overrides that
-  and keeps it expanded regardless of hover, for anyone doing heavy in-app
-  navigation who doesn't want it collapsing on them.
 */
 const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/", label: "Home", built: true },
@@ -38,135 +30,52 @@ const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", built: true },
 ];
 
-const HEADER_GRADIENT = `linear-gradient(135deg, ${hexToRgba(colorForIndex(0), 0.1)}, ${hexToRgba(
-  colorForIndex(2),
-  0.1
-)}, ${hexToRgba(colorForIndex(4), 0.1)}, ${hexToRgba(colorForIndex(6), 0.1)})`;
-
-const PIN_KEY = "ar-manager-nav-pinned";
-const HOVER_COLLAPSE_DELAY_MS = 300;
-
-function initials(label: string) {
-  return label
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
-
 export function Nav({ session }: { session: Session }) {
   const pathname = usePathname();
-  const [pinned, setPinned] = useState(false);
-  const [hovering, setHovering] = useState(false);
-  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const expanded = pinned || hovering;
-
-  const listRef = useRef<HTMLDivElement | null>(null);
-  const itemRefs = useRef<(HTMLElement | null)[]>([]);
-  const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false });
-
-  useLayoutEffect(() => {
-    const activeIndex = LINKS.findIndex((l) => l.href === pathname);
-    const targetIndex = hoveredIndex ?? (activeIndex >= 0 ? activeIndex : null);
-    const el = targetIndex !== null ? itemRefs.current[targetIndex] : null;
-    if (el) {
-      setIndicator({ top: el.offsetTop, height: el.offsetHeight, ready: true });
-    } else {
-      setIndicator((s) => ({ ...s, ready: false }));
-    }
-  }, [hoveredIndex, pathname, expanded]);
-
-  function handleMouseEnter() {
-    if (hideTimer.current) {
-      clearTimeout(hideTimer.current);
-      hideTimer.current = null;
-    }
-    setHovering(true);
-  }
-
-  function handleMouseLeave() {
-    setHoveredIndex(null);
-    hideTimer.current = setTimeout(() => setHovering(false), HOVER_COLLAPSE_DELAY_MS);
-  }
 
   function handleSignOut() {
     clearSession();
     window.location.href = "/";
   }
 
-  const activeIndex = LINKS.findIndex((l) => l.href === pathname);
-  const indicatorIsActive = (hoveredIndex ?? activeIndex) === activeIndex && activeIndex >= 0;
-  const indicatorAccent = colorForIndex(hoveredIndex ?? (activeIndex >= 0 ? activeIndex : 0));
-
   return (
-    <nav
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`no-print flex h-full flex-col border-r border-slate-200 bg-white transition-[width] duration-300 ease-out dark:border-slate-800 dark:bg-slate-900 ${
-        expanded ? "w-60" : "w-16"
-      }`}
-    >
-      <div className="flex-1 overflow-y-auto p-4">
-        {!expanded ? (
-          <p className="mb-4 px-2 text-sm font-bold text-brand">V</p>
-        ) : (
-          <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5" style={{ background: HEADER_GRADIENT }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/brand/verve-logo.png"
-              alt="Verve Advisory"
-              className="h-16 w-auto dark:brightness-0 dark:invert"
-            />
-            <div className="mt-2">
-              <AR360Logo className="h-9" />
-            </div>
-            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">(360° AR management)</p>
-          </div>
-        )}
+    <nav className="no-print relative flex h-full w-60 flex-col overflow-hidden bg-gradient-to-b from-chrome-light via-chrome to-chrome-dark">
+      {/* Scattered finance-icon backdrop, echoing the Sign In screen */}
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute left-[8%] top-[30%] w-28 -rotate-6 text-white opacity-[0.07]">
+          <FinanceIcon path={ledgerGridPath} className="h-auto w-full" />
+        </div>
+        <div className="absolute right-[-10%] top-[55%] w-32 rotate-6 text-white opacity-[0.06]">
+          <FinanceIcon path={calculatorPath} className="h-auto w-full" />
+        </div>
+        <div className="absolute bottom-[6%] left-[-6%] w-24 rotate-3 text-white opacity-[0.07]">
+          <FinanceIcon path={invoicePath} className="h-auto w-full" />
+        </div>
+      </div>
 
-        <div ref={listRef} className="relative flex flex-col gap-1">
-          {/* Sliding highlight — glides to whichever row is hovered, or the
-              active page when nothing's hovered. transform (not top) keeps
-              the glide on the GPU-accelerated path. */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 rounded-lg transition-all duration-300 ease-out"
-            style={{
-              transform: `translateY(${indicator.top}px)`,
-              height: indicator.height,
-              opacity: indicator.ready ? 1 : 0,
-              backgroundColor: indicatorIsActive ? undefined : hexToRgba(indicatorAccent, 0.08),
-            }}
-          >
-            {indicatorIsActive && <div className="h-full w-full rounded-lg bg-brand" />}
-            <div
-              className="absolute inset-y-0 left-0 w-[3px] rounded-l-lg transition-colors duration-300 ease-out"
-              style={{ backgroundColor: indicatorAccent }}
-            />
+      <div className="relative z-10 flex-1 overflow-y-auto p-4">
+        <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-16 w-auto brightness-0 invert" />
+          <div className="mt-2">
+            <AR360Logo className="h-9" invert="always" />
           </div>
-
-          {LINKS.map((l, i) => {
+          <p className="mt-1 text-xs font-medium text-white/70">(360° AR management)</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          {LINKS.map((l) => {
             const active = pathname === l.href;
             if (!l.built) {
               return (
                 <span
                   key={l.href}
-                  ref={(el) => {
-                    itemRefs.current[i] = el;
-                  }}
                   title={l.label}
-                  onMouseEnter={() => setHoveredIndex(i)}
-                  className="relative z-10 flex items-center justify-between rounded-lg px-3 py-2 text-base text-slate-400 dark:text-slate-600"
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-base text-white/40"
                 >
-                  {!expanded ? initials(l.label) : l.label}
-                  {expanded && (
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
-                      build me
-                    </span>
-                  )}
+                  {l.label}
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/50">
+                    build me
+                  </span>
                 </span>
               );
             }
@@ -175,40 +84,25 @@ export function Nav({ session }: { session: Session }) {
                 key={l.href}
                 href={l.href}
                 title={l.label}
-                ref={(el) => {
-                  itemRefs.current[i] = el;
-                }}
-                onMouseEnter={() => setHoveredIndex(i)}
-                className={`relative z-10 rounded-lg px-3 py-2 text-base font-medium transition-colors duration-300 ${
-                  active ? "text-white" : "text-slate-900 dark:text-slate-100"
+                className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
+                  active ? "bg-white/15 text-white" : "text-white/85 hover:bg-white/10"
                 }`}
               >
-                {!expanded ? initials(l.label) : l.label}
+                {l.label}
               </Link>
             );
           })}
         </div>
       </div>
-      <div className="flex flex-none flex-col gap-2 border-t border-slate-200 p-4 dark:border-slate-800">
-        <ThemeToggle collapsed={!expanded} />
-        <button
-          onClick={() => setPinned((p) => !p)}
-          title={pinned ? "Unpin (auto-hide on mouse leave)" : "Pin sidebar open"}
-          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 ${
-            pinned ? "text-brand" : "text-slate-500 dark:text-slate-400"
-          } ${!expanded ? "justify-center" : "gap-2"}`}
-        >
-          <span aria-hidden>📌</span>
-          {expanded && (pinned ? "Pinned open" : "Pin open")}
-        </button>
+      <div className="relative z-10 flex-none border-t border-white/15 p-4">
+        <p className="truncate text-base font-medium text-white">{session.name}</p>
+        <p className="truncate text-sm text-white/60">{session.email}</p>
         <button
           onClick={handleSignOut}
-          title="Sign out"
-          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${
-            !expanded ? "justify-center" : "gap-2"
-          }`}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
         >
-          {!expanded ? "S" : "Sign out"}
+          <SignOutIcon />
+          Sign out
         </button>
       </div>
     </nav>

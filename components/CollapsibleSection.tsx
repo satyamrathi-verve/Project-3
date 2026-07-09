@@ -19,7 +19,7 @@ export function CollapsibleSection({
   children: ReactNode;
 }) {
   return (
-    <details open={defaultOpen} className="group mb-4 rounded-xl border border-slate-200 bg-white">
+    <details open={defaultOpen} className="group mb-4 rounded-xl border border-slate-200 bg-cream">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 select-none">
         <div className="flex items-center gap-2">
           <svg

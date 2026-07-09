@@ -31,8 +31,8 @@ export function PipelinePanel({ invoices, onCardClick }: { invoices: NormalizedI
           const items = invoices.filter(col.filter);
           const total = items.reduce((s, i) => s + (i.status === "paid" ? i.total : i.outstanding), 0);
           return (
-            <div key={col.key} className={`flex flex-col rounded-xl border border-slate-200 border-t-4 bg-slate-50/60 ${col.accent}`}>
-              <div className="border-b border-slate-200 bg-white p-3">
+            <div key={col.key} className={`flex flex-col rounded-xl border border-slate-200 border-t-4 bg-cream-dim/60 ${col.accent}`}>
+              <div className="border-b border-slate-200 bg-cream p-3">
                 <p className="text-xs font-semibold text-slate-700">{col.label}</p>
                 <p className="text-[11px] text-slate-400">{items.length} invoice{items.length === 1 ? "" : "s"} · {currency(total)}</p>
               </div>
@@ -45,7 +45,7 @@ export function PipelinePanel({ invoices, onCardClick }: { invoices: NormalizedI
                       key={inv.id}
                       type="button"
                       onClick={() => onCardClick?.(inv.id)}
-                      className="rounded-lg border border-slate-200 bg-white p-2.5 text-left text-xs shadow-sm hover:border-brand hover:shadow"
+                      className="rounded-lg border border-slate-200 bg-cream p-2.5 text-left text-xs shadow-sm hover:border-brand hover:shadow"
                     >
                       <p className="font-semibold text-slate-800">{inv.invoice_no}</p>
                       <p className="truncate text-slate-500">{inv.customer_name}</p>

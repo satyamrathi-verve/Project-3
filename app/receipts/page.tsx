@@ -668,7 +668,7 @@ export default function ReceiptEntryPage() {
 
       {isConfigured && formOpen && (
         <form onSubmit={handleSubmit} className="pb-24 lg:pb-0">
-          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-white/95 px-5 py-3 backdrop-blur">
+          <div className="mb-4 flex items-center justify-between rounded-xl border border-slate-200 bg-cream/95 px-5 py-3 backdrop-blur">
             <div>
               <h3 className="text-sm font-semibold text-slate-800">{editingId ? `Edit Receipt — ${receiptNo}` : "New Receipt"}</h3>
               <p className="text-xs text-slate-400">Ctrl+S to save · Esc to cancel · / to search customer</p>
@@ -748,7 +748,7 @@ export default function ReceiptEntryPage() {
                   />
 
                   <FormField label="Customer Code">
-                    <input className={`${inputClass} bg-slate-50`} value={selectedCustomer?.code ?? ""} readOnly />
+                    <input className={`${inputClass} bg-cream-dim`} value={selectedCustomer?.code ?? ""} readOnly />
                   </FormField>
                   <FormField label="Amount Received">
                     <input
@@ -879,7 +879,7 @@ export default function ReceiptEntryPage() {
           </div>
 
           {moreFiltersOpen && (
-            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-cream p-4">
               <FormField label="From">
                 <input type="date" className={inputClass} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
               </FormField>

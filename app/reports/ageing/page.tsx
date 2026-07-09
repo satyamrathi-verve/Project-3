@@ -205,7 +205,7 @@ function EmptyState({ message }: { message: string }) {
 
 function SkeletonPanel() {
   return (
-    <div className="animate-pulse divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+    <div className="animate-pulse divide-y divide-gray-100 rounded-xl border border-gray-200 bg-cream">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 px-4 py-4">
           <div className="h-4 w-36 rounded bg-slate-200" />
@@ -411,7 +411,7 @@ export default function AgeingReportPage() {
             <KpiCard label="Report Date" value={formatDate(asOnDate)} />
           </div>
 
-          <div className="no-print mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="no-print mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-cream p-4 shadow-sm">
             <div className="min-w-[220px] flex-1">
               <label className="block text-xs font-medium text-slate-500" htmlFor="ar-search">
                 Search customer
@@ -458,7 +458,7 @@ export default function AgeingReportPage() {
               type="button"
               onClick={() => fetchAll(false)}
               disabled={refreshing}
-              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim disabled:opacity-60"
             >
               {refreshing ? "Refreshing…" : "Refresh"}
             </button>
@@ -466,7 +466,7 @@ export default function AgeingReportPage() {
               <button
                 type="button"
                 onClick={() => exportCsv(displayRows, tableTotals, asOnDate)}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim"
               >
                 Export Excel
               </button>
@@ -505,7 +505,7 @@ export default function AgeingReportPage() {
             <>
               {/* Desktop / tablet table */}
               <div className="hidden md:block">
-                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+                <div className="overflow-x-auto rounded-xl border border-gray-200 bg-cream shadow-sm">
                   <div className="print-scroll min-h-[460px] max-h-[70vh] overflow-y-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-20">
@@ -529,7 +529,7 @@ export default function AgeingReportPage() {
                           </tr>
                         ) : (
                           displayRows.map((r, idx) => {
-                            const zebra = idx % 2 === 1 ? "bg-slate-50/60" : "bg-white";
+                            const zebra = idx % 2 === 1 ? "bg-cream-dim/60" : "bg-cream";
                             const isWorst = worstOffenderIds.has(r.id);
                             return (
                               <tr
@@ -589,7 +589,7 @@ export default function AgeingReportPage() {
               {/* Mobile card layout */}
               <div className="grid gap-3 md:hidden">
                 {displayRows.length === 0 ? (
-                  <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-gray-200 bg-cream shadow-sm">
                     <EmptyState message={emptyMessage} />
                   </div>
                 ) : (
@@ -599,7 +599,7 @@ export default function AgeingReportPage() {
                       return (
                         <div
                           key={r.id}
-                          className={`rounded-xl border border-gray-200 bg-white p-4 shadow-sm ${isWorst ? "border-l-4 border-l-red-500" : ""}`}
+                          className={`rounded-xl border border-gray-200 bg-cream p-4 shadow-sm ${isWorst ? "border-l-4 border-l-red-500" : ""}`}
                         >
                           <div className="flex items-start justify-between gap-2">
                             <button

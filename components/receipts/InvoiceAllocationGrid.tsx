@@ -97,7 +97,7 @@ export function InvoiceAllocationGrid({
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+      <p className="rounded-lg bg-cream-dim px-4 py-6 text-center text-sm text-slate-500">
         No outstanding invoices for this customer — this receipt will be recorded as fully unapplied.
       </p>
     );
@@ -124,12 +124,12 @@ export function InvoiceAllocationGrid({
       </div>
 
       {visibleRows.length === 0 ? (
-        <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No invoices match this filter.</p>
+        <p className="rounded-lg bg-cream-dim px-4 py-6 text-center text-sm text-slate-500">No invoices match this filter.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full min-w-[800px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
+              <tr className="border-b border-slate-200 bg-cream-dim text-left">
                 <th className="px-3 py-2 font-semibold text-slate-600">Select</th>
                 <SortHeader label="Invoice" k="invoice_no" />
                 <SortHeader label="Invoice Date" k="invoice_date" />

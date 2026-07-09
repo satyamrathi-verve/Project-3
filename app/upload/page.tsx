@@ -504,7 +504,7 @@ export default function UploadPage() {
             title={errors[f.key] ?? ""}
             className={`w-full min-w-[7rem] rounded border px-2 py-1 text-xs outline-none focus:border-brand focus:ring-1 focus:ring-brand ${
               f.numeric ? "text-right tabular-nums" : ""
-            } ${hasError ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+            } ${hasError ? "border-red-400 bg-red-50" : "border-slate-200 bg-cream"}`}
           />
         );
       },
@@ -594,7 +594,7 @@ export default function UploadPage() {
         subtitle="Bulk-import customers or invoices from a CSV file instead of punching them one by one."
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-cream p-4">
         <div className="flex rounded-lg border border-slate-200 p-1">
           <button
             type="button"
@@ -631,14 +631,14 @@ export default function UploadPage() {
       </div>
 
       {rows.length === 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-10 text-center text-slate-400">
+        <div className="rounded-xl border border-slate-200 bg-cream p-10 text-center text-slate-400">
           No file uploaded yet. Choose a CSV above to preview its rows here.
         </div>
       )}
 
       {rows.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-cream shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-cream-dim px-4 py-3">
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-slate-800">Preview</p>
               <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
@@ -658,7 +658,7 @@ export default function UploadPage() {
                 type="button"
                 onClick={() => scrollPreview(-320)}
                 aria-label="Scroll preview left"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:border-brand hover:text-brand"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-cream text-slate-500 transition-colors hover:border-brand hover:text-brand"
               >
                 <ChevronLeftIcon />
               </button>
@@ -666,7 +666,7 @@ export default function UploadPage() {
                 type="button"
                 onClick={() => scrollPreview(320)}
                 aria-label="Scroll preview right"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:border-brand hover:text-brand"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-cream text-slate-500 transition-colors hover:border-brand hover:text-brand"
               >
                 <ChevronRightIcon />
               </button>
@@ -686,7 +686,7 @@ export default function UploadPage() {
           </div>
 
           {invalidCount > 0 && (
-            <p className="border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-500">
+            <p className="border-t border-slate-100 bg-cream-dim/50 px-4 py-2 text-xs text-slate-500">
               Rows with issues are highlighted red. Fix the value directly in the table (hover a red box to see why),
               or fix the CSV and re-upload it.
             </p>

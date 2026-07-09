@@ -25,7 +25,7 @@ export function StatTile({
   }[tone];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-slate-200 bg-cream p-5">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
         <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${toneClass}`}>{icon}</span>

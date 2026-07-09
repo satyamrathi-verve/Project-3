@@ -141,15 +141,15 @@ export function SignInForm({ onSuccess }: { onSuccess: (session: Session) => voi
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-slate-900 p-4">
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-chrome-light via-chrome to-chrome-dark p-4">
       <LoginBackground />
 
       {/* Login card */}
-      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white/95 p-8 shadow-2xl ring-1 ring-black/5 backdrop-blur">
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-cream/95 p-8 shadow-2xl ring-1 ring-black/5 backdrop-blur">
         <div className="mb-6 flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-16 w-auto" />
-          <AR360Logo className="mt-3 h-10" invertOnDark={false} />
+          <AR360Logo className="mt-3 h-10" invert="never" />
           <p className="mt-1 text-xs text-slate-500">(360° AR management)</p>
           <p className="mt-3 text-sm text-slate-500">Welcome back. Sign in to continue.</p>
         </div>
@@ -233,7 +233,7 @@ export function SignInForm({ onSuccess }: { onSuccess: (session: Session) => voi
               </div>
 
               {forgotOpen && (
-                <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                <div className="mt-2 rounded-lg bg-cream-dim p-3 text-xs text-slate-600">
                   Password resets aren&apos;t available in this demo. Contact your administrator, or
                   use one of the demo logins below.
                 </div>

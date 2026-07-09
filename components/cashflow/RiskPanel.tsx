@@ -18,7 +18,7 @@ export function RiskPanel({ customers }: { customers: CustomerMetrics[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
+              <tr className="border-b border-slate-200 bg-cream-dim text-left">
                 <th className="px-3 py-2 font-semibold text-slate-600">Customer</th>
                 <th className="px-3 py-2 font-semibold text-slate-600">Risk</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600">Risk Score</th>
@@ -30,7 +30,7 @@ export function RiskPanel({ customers }: { customers: CustomerMetrics[] }) {
             </thead>
             <tbody>
               {ranked.map((c) => (
-                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-cream-dim">
                   <td className="px-3 py-2 font-medium text-slate-800">{c.name}</td>
                   <td className="px-3 py-2"><Badge tone={riskTone(c.riskLevel)}>{c.riskLevel}</Badge></td>
                   <td className="px-3 py-2 text-right">

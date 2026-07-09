@@ -377,7 +377,7 @@ function CustomersTab({
 function SettingsTab({ onReset }: { onReset: () => void }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-cream p-5 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-slate-900">Scope & Assumptions</h3>
         <ul className="list-disc space-y-2 pl-5 text-sm text-slate-600">
           <li>Every chart and KPI is computed live from <code className="rounded bg-slate-100 px-1">invoices</code>, <code className="rounded bg-slate-100 px-1">receipts</code>, <code className="rounded bg-slate-100 px-1">receipt_allocations</code> and <code className="rounded bg-slate-100 px-1">customers</code> — nothing is hard-coded sample data.</li>
@@ -389,7 +389,7 @@ function SettingsTab({ onReset }: { onReset: () => void }) {
           <li>Collector, remarks, and follow-up date are session-only notes typed into the Receivables table — they are not written back to Supabase.</li>
         </ul>
       </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-cream p-5 shadow-sm">
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Reset Session</h3>
         <p className="mb-3 text-sm text-slate-500">Clears every expected-amount/date edit, follow-up, collector, remark, the audit log, and the saved export schedule for this browser.</p>
         <button type="button" onClick={onReset} className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100">

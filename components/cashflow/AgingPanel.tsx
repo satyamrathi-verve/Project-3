@@ -53,7 +53,7 @@ export function AgingPanel({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-left">
+            <tr className="border-b border-slate-200 bg-cream-dim text-left">
               <th className="px-3 py-2 font-semibold text-slate-600">Customer</th>
               {AGING_BUCKETS.map((b) => (
                 <th key={b} className="px-3 py-2 text-right font-semibold text-slate-600">{b}</th>
@@ -73,7 +73,7 @@ export function AgingPanel({
                 <tr
                   key={r.customer_id}
                   onClick={() => onCustomerClick?.(r.customer_id)}
-                  className={`border-b border-slate-100 last:border-0 ${onCustomerClick ? "cursor-pointer hover:bg-slate-50" : ""}`}
+                  className={`border-b border-slate-100 last:border-0 ${onCustomerClick ? "cursor-pointer hover:bg-cream-dim" : ""}`}
                 >
                   <td className="px-3 py-2 font-medium text-slate-800">{r.customer_name}</td>
                   {AGING_BUCKETS.map((b) => (
@@ -88,7 +88,7 @@ export function AgingPanel({
           </tbody>
           {rows.length > 0 && (
             <tfoot>
-              <tr className="bg-slate-50">
+              <tr className="bg-cream-dim">
                 <td className="px-3 py-2 font-semibold text-slate-900">Grand Total</td>
                 {AGING_BUCKETS.map((b) => (
                   <td key={b} className="px-3 py-2 text-right font-semibold text-slate-900">{currency(totals[b])}</td>

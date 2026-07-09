@@ -7,7 +7,7 @@ const GL_DEBTORS = "Sundry Debtors — Accounts Receivable (1100)";
 
 export function AccountingPreview({ mode, amount }: { mode: ReceiptMode; amount: number }) {
   return (
-    <div className="rounded-lg bg-slate-50 p-4">
+    <div className="rounded-lg bg-cream-dim p-4">
       <p className="text-xs text-slate-400">
         Reference only — this schema has no journal/GL table to post entries to yet.
       </p>

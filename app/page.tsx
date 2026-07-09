@@ -41,7 +41,7 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+      <div className="rounded-xl border border-slate-200 bg-cream p-6 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           How this works
         </h3>
@@ -53,7 +53,7 @@ export default function HomePage() {
         </ol>
       </div>
 
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+      <div className="mt-6 rounded-xl border border-slate-200 bg-cream p-6 dark:border-slate-800 dark:bg-slate-900">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           The screens to build
         </h3>

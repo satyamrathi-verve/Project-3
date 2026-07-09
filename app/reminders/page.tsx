@@ -330,7 +330,7 @@ export default function ReminderTemplatePage() {
         <p className="text-sm text-slate-500 dark:text-slate-400">Loading template…</p>
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
+          <div className="rounded-xl border border-slate-200 bg-cream p-6 dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <h3 className="text-base font-semibold text-slate-900 dark:text-white">
@@ -346,7 +346,7 @@ export default function ReminderTemplatePage() {
                   className={
                     mode === "edit"
                       ? "rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark dark:border-brand dark:bg-brand/20 dark:text-blue-300"
-                      : "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                      : "rounded-lg border border-slate-300 bg-cream px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   }
                 >
                   Edit Template
@@ -418,7 +418,7 @@ export default function ReminderTemplatePage() {
                     Email body
                   </span>
                   <div className="overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700">
-                    <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 p-1.5 dark:border-slate-700 dark:bg-slate-800">
+                    <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-cream-dim p-1.5 dark:border-slate-700 dark:bg-slate-800">
                       <button
                         type="button"
                         title="Bold"
@@ -488,7 +488,7 @@ export default function ReminderTemplatePage() {
                     </div>
                     <textarea
                       ref={bodyRef}
-                      className="min-h-[380px] w-full bg-white px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none dark:bg-slate-800 dark:text-slate-100"
+                      className="min-h-[380px] w-full bg-cream px-3 py-2 text-sm leading-relaxed text-slate-800 outline-none dark:bg-slate-800 dark:text-slate-100"
                       value={body}
                       onFocus={() => (lastFocused.current = "body")}
                       onChange={(e) => setBody(e.target.value)}
@@ -501,7 +501,7 @@ export default function ReminderTemplatePage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mt-6 rounded-lg border border-slate-200 bg-cream-dim p-5 dark:border-slate-700 dark:bg-slate-800">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                   To
                 </p>
@@ -529,7 +529,7 @@ export default function ReminderTemplatePage() {
               <button
                 onClick={handleSaveTemplate}
                 disabled={mode !== "edit" || savingTemplate || !templateId}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="rounded-lg border border-slate-300 bg-cream px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 {savingTemplate ? "Saving…" : "Save"}
               </button>
@@ -544,7 +544,7 @@ export default function ReminderTemplatePage() {
           </div>
 
           <div className="flex flex-col gap-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-cream p-6 dark:border-slate-800 dark:bg-slate-900">
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                 Available Placeholders
               </h3>
@@ -565,7 +565,7 @@ export default function ReminderTemplatePage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+            <div className="rounded-xl border border-slate-200 bg-cream p-6 dark:border-slate-800 dark:bg-slate-900">
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                 Who to send it to
               </h3>
@@ -587,7 +587,7 @@ export default function ReminderTemplatePage() {
                   onBlur={() => setTimeout(() => setShowInvoiceDropdown(false), 150)}
                 />
                 {showInvoiceDropdown && (
-                  <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                  <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-cream shadow-lg dark:border-slate-700 dark:bg-slate-800">
                     <button
                       type="button"
                       onMouseDown={() => {
@@ -595,7 +595,7 @@ export default function ReminderTemplatePage() {
                         setInvoiceQuery("");
                         setShowInvoiceDropdown(false);
                       }}
-                      className="block w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700"
+                      className="block w-full px-3 py-2 text-left text-sm text-slate-500 hover:bg-cream-dim dark:text-slate-400 dark:hover:bg-slate-700"
                     >
                       Sample data (no invoice selected)
                     </button>
@@ -613,7 +613,7 @@ export default function ReminderTemplatePage() {
                             setInvoiceQuery(`${inv.invoice_no} — ${inv.customer_name}`);
                             setShowInvoiceDropdown(false);
                           }}
-                          className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                          className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-cream-dim dark:text-slate-200 dark:hover:bg-slate-700"
                         >
                           {inv.invoice_no} — {inv.customer_name}
                         </button>

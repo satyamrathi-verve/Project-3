@@ -208,6 +208,7 @@ export default function AutoEmailShootPage() {
 
   const [view, setView] = useState<"chase" | "history">("chase");
   const [historyRows, setHistoryRows] = useState<HistoryRow[]>([]);
+  const [historyCustomerFilter, setHistoryCustomerFilter] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
@@ -359,9 +360,20 @@ export default function AutoEmailShootPage() {
   }
 
   function openHistory() {
+    setHistoryCustomerFilter(null);
     setView("history");
     loadHistory();
   }
+
+  function openHistoryForCustomer(name: string) {
+    setHistoryCustomerFilter(name);
+    setView("history");
+    loadHistory();
+  }
+
+  const visibleHistoryRows = historyCustomerFilter
+    ? historyRows.filter((r) => r.customer_name === historyCustomerFilter)
+    : historyRows;
 
   function toggleOne(id: string) {
     setSelectedIds((prev) => {
@@ -586,14 +598,16 @@ export default function AutoEmailShootPage() {
         subtitle={
           view === "chase"
             ? "One email per overdue customer, covering all their overdue invoices. Click a row to view invoices."
-            : "Every reminder ever logged, newest first."
+            : historyCustomerFilter
+              ? `Every reminder sent to ${historyCustomerFilter}, newest first.`
+              : "Every reminder ever logged, newest first."
         }
         action={
           view === "chase" ? (
             <div className="flex gap-2">
               <button
                 onClick={openHistory}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="rounded-lg border border-slate-300 bg-cream px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Sent history
               </button>
@@ -622,10 +636,26 @@ export default function AutoEmailShootPage() {
         historyLoading ? (
           <p className="text-sm text-slate-500 dark:text-slate-400">Loading sent history…</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+          <>
+            {historyCustomerFilter && (
+              <p className="mb-4 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                Filtered to{" "}
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {historyCustomerFilter}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHistoryCustomerFilter(null)}
+                  className="font-medium text-brand hover:underline"
+                >
+                  Show all customers
+                </button>
+              </p>
+            )}
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-cream dark:border-slate-800 dark:bg-slate-900">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left dark:border-slate-800 dark:bg-slate-800">
+                <tr className="border-b border-slate-200 bg-cream-dim text-left dark:border-slate-800 dark:bg-slate-800">
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Sent</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Customer</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Invoice</th>
@@ -635,17 +665,17 @@ export default function AutoEmailShootPage() {
                 </tr>
               </thead>
               <tbody>
-                {historyRows.length === 0 ? (
+                {visibleHistoryRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center text-slate-400 dark:text-slate-600">
-                      Nothing sent yet.
+                      {historyCustomerFilter ? "Nothing sent to this customer yet." : "Nothing sent yet."}
                     </td>
                   </tr>
                 ) : (
-                  historyRows.map((r) => (
+                  visibleHistoryRows.map((r) => (
                     <tr
                       key={r.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                      className="border-b border-slate-100 last:border-0 hover:bg-cream-dim dark:border-slate-800 dark:hover:bg-slate-800"
                     >
                       <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
                         {new Date(r.sent_at).toLocaleString("en-IN")}
@@ -666,7 +696,8 @@ export default function AutoEmailShootPage() {
                 )}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )
       ) : loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Loading overdue invoices…</p>
@@ -689,7 +720,7 @@ export default function AutoEmailShootPage() {
             .
           </p>
 
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-cream p-4 dark:border-slate-800 dark:bg-slate-900">
             <div>
               <h3 className="text-base font-semibold text-slate-900 dark:text-white">
                 Monthly statement shoot
@@ -724,12 +755,12 @@ export default function AutoEmailShootPage() {
           )}
 
           {customerGroups.length === 0 ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+            <div className="rounded-xl border border-slate-200 bg-cream p-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
               Nothing overdue right now — every invoice is either paid or not yet due.
             </div>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-cream p-4 dark:border-slate-800 dark:bg-slate-900">
                 <p className="text-sm text-slate-600 dark:text-slate-300">
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {customerGroups.length}
@@ -752,7 +783,7 @@ export default function AutoEmailShootPage() {
                   </span>
                   <button
                     onClick={selectAllSendable}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="rounded-lg border border-slate-300 bg-cream px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     Select all
                   </button>
@@ -762,7 +793,7 @@ export default function AutoEmailShootPage() {
                       if (e.target.value) selectByAgeRange(e.target.value);
                       e.target.value = "";
                     }}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="rounded-lg border border-slate-300 bg-cream px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     <option value="" disabled>
                       By age range…
@@ -775,13 +806,13 @@ export default function AutoEmailShootPage() {
                   </select>
                   <button
                     onClick={selectOnlyNeverChased}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="rounded-lg border border-slate-300 bg-cream px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     Only never chased
                   </button>
                   <button
                     onClick={clearSelection}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                    className="rounded-lg border border-slate-300 bg-cream px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
                     Clear
                   </button>
@@ -809,7 +840,7 @@ export default function AutoEmailShootPage() {
                 </p>
               )}
 
-              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-cream shadow-sm dark:border-slate-800 dark:bg-slate-900">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b-2 border-brand/30 bg-brand/10 text-left dark:border-brand/40 dark:bg-brand/20">
@@ -851,7 +882,7 @@ export default function AutoEmailShootPage() {
                               return (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute left-0 z-20 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-3 normal-case shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                                  className="absolute left-0 z-20 mt-2 w-64 rounded-lg border border-slate-200 bg-cream p-3 normal-case shadow-lg dark:border-slate-700 dark:bg-slate-800"
                                 >
                                   <div className="flex items-center justify-between">
                                     <div className="relative flex-1">
@@ -903,7 +934,7 @@ export default function AutoEmailShootPage() {
                                       shownValues.map((v) => (
                                         <label
                                           key={v}
-                                          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-xs font-normal text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                                          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-xs font-normal text-slate-700 hover:bg-cream-dim dark:text-slate-200 dark:hover:bg-slate-700"
                                         >
                                           <input
                                             type="checkbox"
@@ -943,7 +974,7 @@ export default function AutoEmailShootPage() {
                             <tr
                               onClick={() => setExpandedId(expanded ? null : g.customer_id)}
                               className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-brand/5 dark:border-slate-800 dark:hover:bg-slate-800 ${
-                                i % 2 === 1 ? "bg-slate-50/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
+                                i % 2 === 1 ? "bg-cream-dim/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
                               }`}
                             >
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -956,7 +987,17 @@ export default function AutoEmailShootPage() {
                                 />
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
-                                {g.customer_name}
+                                <button
+                                  type="button"
+                                  title={`View email history for ${g.customer_name}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openHistoryForCustomer(g.customer_name);
+                                  }}
+                                  className="text-left hover:text-brand hover:underline"
+                                >
+                                  {g.customer_name}
+                                </button>
                               </td>
                               <td className="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-300">
                                 {g.customer_email ?? (
@@ -1017,11 +1058,11 @@ export default function AutoEmailShootPage() {
                             </tr>
                             {expanded && (
                               <tr className="border-b border-slate-100 dark:border-slate-800">
-                                <td colSpan={COLUMNS.length + 2} className="bg-slate-50 px-4 py-4 dark:bg-slate-800">
+                                <td colSpan={COLUMNS.length + 2} className="bg-cream-dim px-4 py-4 dark:bg-slate-800">
                                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                                     Overdue invoices for {g.customer_name}
                                   </p>
-                                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-cream dark:border-slate-700 dark:bg-slate-900">
                                     <table className="w-full text-sm">
                                       <thead>
                                         <tr className="border-b border-slate-200 bg-slate-100 text-left dark:border-slate-700 dark:bg-slate-800">

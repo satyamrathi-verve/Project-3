@@ -28,7 +28,7 @@ const LABELS: Record<TabKey, string> = {
 
 export function Tabs({ active, onChange }: { active: TabKey; onChange: (t: TabKey) => void }) {
   return (
-    <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+    <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-cream p-1 shadow-sm">
       {TAB_KEYS.map((key) => (
         <button
           key={key}

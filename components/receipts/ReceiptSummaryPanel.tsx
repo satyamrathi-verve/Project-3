@@ -62,12 +62,12 @@ export function ReceiptSummaryPanel({
   return (
     <>
       {/* Desktop / tablet: sticky card */}
-      <div className="hidden lg:sticky lg:top-6 lg:block lg:w-72 lg:flex-none lg:self-start lg:rounded-xl lg:border lg:border-slate-200 lg:bg-white lg:p-5">
+      <div className="hidden lg:sticky lg:top-6 lg:block lg:w-72 lg:flex-none lg:self-start lg:rounded-xl lg:border lg:border-slate-200 lg:bg-cream lg:p-5">
         {body}
       </div>
 
       {/* Mobile: collapsible bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white shadow-[0_-4px_12px_rgba(0,0,0,0.06)] lg:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-cream shadow-[0_-4px_12px_rgba(0,0,0,0.06)] lg:hidden">
         <button
           type="button"
           onClick={() => setMobileOpen((v) => !v)}

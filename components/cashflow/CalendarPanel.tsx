@@ -54,12 +54,12 @@ export function CalendarPanel({ invoices, onDayClick }: { invoices: NormalizedIn
       subtitle="Expected collections by due date. Toggle Heat Map to see concentration at a glance."
       action={
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => setHeatMap((v) => !v)} className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={() => setHeatMap((v) => !v)} className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-cream-dim">
             {heatMap ? "Show Amounts" : "Heat Map"}
           </button>
-          <button type="button" onClick={() => setMonthOffset((v) => v - 1)} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">‹</button>
+          <button type="button" onClick={() => setMonthOffset((v) => v - 1)} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-cream-dim">‹</button>
           <span className="min-w-[7rem] text-center text-xs font-semibold text-slate-700">{label}</span>
-          <button type="button" onClick={() => setMonthOffset((v) => v + 1)} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">›</button>
+          <button type="button" onClick={() => setMonthOffset((v) => v + 1)} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-cream-dim">›</button>
         </div>
       }
     >

@@ -54,7 +54,7 @@ const GST_CHIP_ACTIVE: Record<GstStatus, string> = {
    glance — not just after you click something. */
 const GST_CHIP_INACTIVE: Record<GstStatus, string> = {
   Registered: "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
-  Unregistered: "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100",
+  Unregistered: "border border-slate-200 bg-cream-dim text-slate-600 hover:bg-slate-100",
 };
 
 export default function CustomerMasterPage() {
@@ -316,7 +316,7 @@ export default function CustomerMasterPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-cream p-4 shadow-sm">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -356,7 +356,7 @@ export default function CustomerMasterPage() {
       </div>
 
       {formOpen && (
-        <form onSubmit={save} className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
+        <form onSubmit={save} className="mb-6 rounded-xl border border-slate-200 bg-cream p-6">
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
             {editingId ? "Edit customer" : "New customer"}
           </h3>
@@ -409,7 +409,7 @@ export default function CustomerMasterPage() {
       )}
 
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+        <div className="rounded-xl border border-slate-200 bg-cream px-4 py-10 text-center text-sm text-slate-400">
           Loading customers…
         </div>
       ) : loadError ? (

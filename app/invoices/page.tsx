@@ -174,7 +174,7 @@ export default function InvoiceListPage() {
     <>
       <PageHeader title="Sales Invoices" subtitle="Every invoice raised, and where it stands." />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-cream p-4 shadow-sm">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -214,7 +214,7 @@ export default function InvoiceListPage() {
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+        <div className="rounded-xl border border-slate-200 bg-cream px-4 py-10 text-center text-sm text-slate-400">
           Loading invoices…
         </div>
       ) : loadError ? (

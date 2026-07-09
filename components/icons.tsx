@@ -65,3 +65,12 @@ export function DownloadIcon({ className = "h-4 w-4" }: IconProps) {
     </svg>
   );
 }
+
+export function SignOutIcon({ className = "h-4 w-4" }: IconProps) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5H6a1.5 1.5 0 00-1.5 1.5v12A1.5 1.5 0 006 19.5h3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 8l4 4-4 4M18.25 12h-9.5" />
+    </svg>
+  );
+}

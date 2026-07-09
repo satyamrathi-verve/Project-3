@@ -340,7 +340,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-cream p-6 sm:grid-cols-2 lg:grid-cols-3">
         <FormField label="Invoice No.">
           <input className={inputClass} value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} />
         </FormField>
@@ -393,7 +393,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         </FormField>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-cream p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Transporter Details</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FormField label="Transporter">
@@ -427,7 +427,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-cream p-6">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">E-Invoice (IRN)</h3>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <FormField label="IRN">
@@ -442,7 +442,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-cream p-6">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Shipping Details</h3>
           <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -470,13 +470,13 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         )}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-6">
+      <div className="rounded-xl border border-slate-200 bg-cream p-6">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Line items</h3>
           <button
             type="button"
             onClick={addLine}
-            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim"
           >
             + Add line
           </button>
@@ -485,7 +485,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full min-w-[900px] text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
+              <tr className="border-b border-slate-200 bg-cream-dim text-left">
                 <th className="px-3 py-2 font-semibold text-slate-600">Description</th>
                 <th className="w-28 px-3 py-2 font-semibold text-slate-600">HSN/SAC</th>
                 <th className="w-20 px-3 py-2 font-semibold text-slate-600">Qty</th>
@@ -587,7 +587,7 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
           </FormField>
         </div>
 
-        <div className="w-full max-w-xs space-y-2 rounded-xl border border-slate-200 bg-white p-6">
+        <div className="w-full max-w-xs space-y-2 rounded-xl border border-slate-200 bg-cream p-6">
           <div className="flex justify-between text-sm text-slate-600">
             <span>Subtotal</span>
             <span>{subtotal.toFixed(2)}</span>

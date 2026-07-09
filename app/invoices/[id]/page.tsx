@@ -60,7 +60,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+      <div className="rounded-xl border border-slate-200 bg-cream px-4 py-10 text-center text-sm text-slate-400">
         Loading invoice…
       </div>
     );
@@ -84,7 +84,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
 
   if (notFound || !invoice) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
+      <div className="rounded-xl border border-slate-200 bg-cream p-10 text-center">
         <p className="font-semibold text-slate-700">This invoice doesn&apos;t exist.</p>
         <p className="mt-1 text-sm text-slate-500">It may have been removed, or the link is wrong.</p>
         <Link href="/invoices" className="mt-4 inline-block text-sm font-medium text-brand hover:underline">
@@ -107,7 +107,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
 
       {/* Header: our company (the "invoice header") on the left, this invoice's
           identity and status on the right. */}
-      <div className="mb-6 flex flex-col gap-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-6 flex flex-col gap-6 rounded-xl border border-slate-200 bg-cream p-6 shadow-sm sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-brand">Tax Invoice</p>
           <h2 className="mt-1 text-xl font-bold text-slate-900">{company?.name ?? "Verve Advisory Pvt Ltd"}</h2>
@@ -133,7 +133,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Customer block */}
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-xl border border-slate-200 bg-cream p-6 shadow-sm">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bill To</p>
         <h3 className="mt-1 text-lg font-semibold text-slate-900">{invoice.customers?.name ?? "Unknown customer"}</h3>
         {invoice.customers && (
@@ -148,7 +148,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Line items */}
-      <div className="mb-6 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="mb-6 overflow-x-auto rounded-xl border border-slate-200 bg-cream shadow-sm">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-2 border-brand/30 bg-brand/10 text-left">
@@ -177,7 +177,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
               items.map((item, i) => (
                 <tr
                   key={item.id}
-                  className={`border-b border-slate-100 last:border-0 ${i % 2 === 1 ? "bg-slate-50/70" : ""}`}
+                  className={`border-b border-slate-100 last:border-0 ${i % 2 === 1 ? "bg-cream-dim/70" : ""}`}
                 >
                   <td className="px-4 py-3 text-slate-700">{item.description}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{item.qty}</td>
@@ -191,7 +191,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
       </div>
 
       {/* Money summary */}
-      <div className="ml-auto max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="ml-auto max-w-sm rounded-xl border border-slate-200 bg-cream p-6 shadow-sm">
         <dl className="space-y-2 text-sm">
           <div className="flex justify-between">
             <dt className="text-slate-500">Subtotal</dt>

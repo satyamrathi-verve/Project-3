@@ -47,13 +47,13 @@ export function ExportMenu({ rows }: { rows: AdjustmentRow[] }) {
         <button type="button" onClick={() => exportCsv(false)} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
           Export CSV
         </button>
-        <button type="button" onClick={() => exportCsv(true)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={() => exportCsv(true)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim">
           Export Excel (.csv)
         </button>
-        <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={() => window.print()} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim">
           Print / Save as PDF
         </button>
-        <button type="button" onClick={() => setShowSchedule((v) => !v)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <button type="button" onClick={() => setShowSchedule((v) => !v)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-cream-dim">
           Schedule Email Report
         </button>
       </div>
@@ -64,7 +64,7 @@ export function ExportMenu({ rows }: { rows: AdjustmentRow[] }) {
       </p>
 
       {showSchedule && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="mt-4 rounded-xl border border-slate-200 bg-cream-dim p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <input type="email" placeholder="Recipient email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${inputClass} py-2 text-sm`} />
             <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className={`${inputClass} py-2 text-sm`}>

@@ -75,7 +75,7 @@ export function DataTable<T extends { id: string }>({
               key={row.id}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={`border-b border-slate-100 last:border-0 transition-colors hover:bg-brand/5 dark:border-slate-800 dark:hover:bg-slate-800 ${
-                i % 2 === 1 ? "bg-slate-50/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
+                i % 2 === 1 ? "bg-cream-dim/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
               } ${onRowClick ? "cursor-pointer" : ""} ${rowClassName?.(row) ?? ""}`}
             >
               {columns.map((c) => (
@@ -98,7 +98,7 @@ export function DataTable<T extends { id: string }>({
   if (bare) return table;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-cream shadow-sm dark:border-slate-800 dark:bg-slate-900">
       {table}
     </div>
   );

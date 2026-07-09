@@ -77,14 +77,14 @@ export function AdjustmentTable({
             }}
             className={`${inputClass} w-56 py-1.5 text-xs`}
           />
-          <button type="button" onClick={() => setShowAudit((v) => !v)} className="whitespace-nowrap rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50">
+          <button type="button" onClick={() => setShowAudit((v) => !v)} className="whitespace-nowrap rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-cream-dim">
             {showAudit ? "Hide" : "Show"} Audit Log ({audit.length})
           </button>
         </div>
       }
     >
       {showAudit && (
-        <div className="mb-4 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+        <div className="mb-4 max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-cream-dim p-3 text-xs">
           {audit.length === 0 ? (
             <p className="text-slate-400">No edits made this session yet.</p>
           ) : (
@@ -108,7 +108,7 @@ export function AdjustmentTable({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                <tr className="border-b border-slate-200 bg-cream-dim text-left">
                   <Th label="Invoice" />
                   <Th label="Customer" sortableKey="customer_name" />
                   <th className="px-3 py-2 font-semibold text-slate-600">Status</th>
@@ -125,7 +125,7 @@ export function AdjustmentTable({
               </thead>
               <tbody>
                 {pageRows.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <tr key={r.id} className="border-b border-slate-100 last:border-0 hover:bg-cream-dim">
                     <td className="px-3 py-2 font-medium text-slate-800">{r.invoice_no}</td>
                     <td className="px-3 py-2 text-slate-700">{r.customer_name}</td>
                     <td className="px-3 py-2"><Badge tone={statusTone(r.status)}>{r.status}</Badge></td>

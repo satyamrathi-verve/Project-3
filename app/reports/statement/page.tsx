@@ -259,19 +259,19 @@ export default function CustomerStatementPage() {
 
       {isConfigured && (
         <>
-          <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-4 print:hidden">
+          <div className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-cream p-4 print:hidden">
             <div className="flex overflow-hidden rounded-lg border border-slate-200">
               <button
                 type="button"
                 onClick={() => setViewMode("single")}
-                className={`px-3 py-2 text-sm font-medium ${viewMode === "single" ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                className={`px-3 py-2 text-sm font-medium ${viewMode === "single" ? "bg-brand text-white" : "text-slate-600 hover:bg-cream-dim"}`}
               >
                 Single Customer
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("all")}
-                className={`px-3 py-2 text-sm font-medium ${viewMode === "all" ? "bg-brand text-white" : "text-slate-600 hover:bg-slate-50"}`}
+                className={`px-3 py-2 text-sm font-medium ${viewMode === "all" ? "bg-brand text-white" : "text-slate-600 hover:bg-cream-dim"}`}
               >
                 All Customers
               </button>
@@ -316,7 +316,7 @@ export default function CustomerStatementPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-cream-dim"
                 >
                   Print / Save as PDF
                 </button>
@@ -333,7 +333,7 @@ export default function CustomerStatementPage() {
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-cream-dim"
                 >
                   Print All / Save as PDF
                 </button>
@@ -347,7 +347,7 @@ export default function CustomerStatementPage() {
           {loading && <TableSkeleton rows={5} cols={6} />}
 
           {!loading && viewMode === "single" && !selectedCustomer && (
-            <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            <p className="rounded-lg bg-cream-dim px-4 py-8 text-center text-sm text-slate-500">
               Select a customer above to view their statement.
             </p>
           )}
@@ -366,14 +366,14 @@ export default function CustomerStatementPage() {
                 .
               </p>
               {allStatements.length === 0 ? (
-                <p className="rounded-lg bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                <p className="rounded-lg bg-cream-dim px-4 py-8 text-center text-sm text-slate-500">
                   No customers with activity in this period.
                 </p>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white print:border-0">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-cream print:border-0">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                      <tr className="border-b border-slate-200 bg-cream-dim text-left">
                         <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
                         <th className="px-4 py-3 text-right font-semibold text-slate-600">Opening Balance</th>
                         <th className="px-4 py-3 text-right font-semibold text-slate-600">Invoiced</th>
@@ -384,7 +384,7 @@ export default function CustomerStatementPage() {
                     </thead>
                     <tbody>
                       {allStatements.map(({ customer, statement }) => (
-                        <tr key={customer.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                        <tr key={customer.id} className="border-b border-slate-100 last:border-0 hover:bg-cream-dim">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <Avatar name={customer.name} className="h-8 w-8 text-xs" />
@@ -414,7 +414,7 @@ export default function CustomerStatementPage() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-slate-200 bg-slate-50">
+                      <tr className="border-t border-slate-200 bg-cream-dim">
                         <td className="px-4 py-3 font-semibold text-slate-700">Total</td>
                         <td className="px-4 py-3 text-right font-semibold text-slate-800">
                           {money(allStatements.reduce((s, x) => s + x.statement.openingBalance, 0))}

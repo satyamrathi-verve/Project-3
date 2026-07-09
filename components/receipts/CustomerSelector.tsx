@@ -51,7 +51,7 @@ export const CustomerSelector = forwardRef<
       </FormField>
       {error && <p className="mt-1 text-xs font-medium text-red-600">{error}</p>}
       {open && !disabled && (
-        <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-slate-200 bg-cream shadow-lg">
           {matches.length === 0 ? (
             <p className="px-3 py-2 text-sm text-slate-400">No matching customers.</p>
           ) : (
@@ -60,7 +60,7 @@ export const CustomerSelector = forwardRef<
                 key={c.id}
                 type="button"
                 onMouseDown={() => select(c)}
-                className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                className="block w-full px-3 py-2 text-left text-sm hover:bg-cream-dim"
               >
                 <span className="font-medium text-slate-700">{c.code}</span>{" "}
                 <span className="text-slate-500">— {c.name}</span>

@@ -11,7 +11,7 @@ export default function SignInPage() {
   const session = getSession();
 
   return (
-    <div className="mx-auto max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center">
+    <div className="mx-auto max-w-md rounded-xl border border-slate-200 bg-cream p-6 text-center">
       <p className="text-sm text-slate-500">You&apos;re already signed in as</p>
       <p className="mt-1 text-lg font-semibold text-slate-900">{session?.name}</p>
       <p className="text-xs text-slate-400">{session?.email}</p>

@@ -229,7 +229,7 @@ function GLMasterScreen() {
             <button
               type="button"
               onClick={() => handleExport("filtered")}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              className="rounded-lg border border-slate-300 bg-cream px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-cream-dim"
             >
               Export
             </button>
@@ -315,7 +315,7 @@ function SummaryStrip({
   return (
     <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {cards.map((c) => (
-        <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-4">
+        <div key={c.label} className="rounded-xl border border-slate-200 bg-cream p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{c.label}</p>
           <p className={`mt-1 text-xl font-bold ${c.tone}`}>
             {c.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -463,7 +463,7 @@ function AddAccountModal({
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-6">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-cream p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900">Add New Account</h3>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
@@ -475,7 +475,7 @@ function AddAccountModal({
             <input
               disabled
               value={reservedCode ?? (reserveError ? "Unavailable" : "Reserving…")}
-              className={`${inputClass} cursor-not-allowed bg-slate-50 font-mono text-slate-500`}
+              className={`${inputClass} cursor-not-allowed bg-cream-dim font-mono text-slate-500`}
             />
           </FormField>
           <FormField label="Account Name">
@@ -530,7 +530,7 @@ function AddAccountModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-cream-dim"
             >
               Cancel
             </button>
@@ -609,7 +609,7 @@ function EditAccountModal({
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-6">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-cream p-6">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900">Edit Account — {account.code}</h3>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
@@ -668,7 +668,7 @@ function EditAccountModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-cream-dim"
             >
               Cancel
             </button>
@@ -791,14 +791,14 @@ function GLImportExportMenu({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+        className="rounded-lg border border-slate-300 bg-cream px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-cream-dim"
       >
         Import
       </button>
 
       {open && (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-6">
+          <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-cream p-6">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900">Import GL Accounts</h3>
               <button
@@ -892,7 +892,7 @@ function GLImportExportMenu({
                         setOpen(false);
                         reset();
                       }}
-                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-cream-dim"
                     >
                       Cancel
                     </button>
