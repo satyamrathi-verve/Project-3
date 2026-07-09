@@ -1025,13 +1025,13 @@ export default function DashboardPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search customer name…"
-                    className="w-full rounded-full border border-slate-300 bg-cream py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                    className="w-full rounded-full border border-slate-300 bg-cream py-2 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <select
                   value={riskFilter}
                   onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
-                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="all">All risk tiers</option>
                   <option value="High">High risk</option>
@@ -1041,7 +1041,7 @@ export default function DashboardPage() {
                 <select
                   value={daysFilter}
                   onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
-                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 >
                   <option value="all">Any days past due</option>
                   <option value="1-30">1–30 days</option>
@@ -1052,7 +1052,7 @@ export default function DashboardPage() {
                 <select
                   value={segmentFilter}
                   onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
-                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm text-slate-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
                 >
                   <option value="all">All segments</option>

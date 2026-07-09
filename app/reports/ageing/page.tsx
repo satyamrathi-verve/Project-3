@@ -195,7 +195,11 @@ function BucketCell({ value, tone }: { value: number; tone: BucketKey }) {
     );
   }
   const bg = { d0_30: "bg-blue-50/60", d30_60: "bg-yellow-50", d60_90: "bg-orange-50" }[tone];
-  return <td className={`px-4 py-3 text-right tabular-nums ${bg}`}>{money(value)}</td>;
+  // Fixed dark text, no dark: variant — these bucket backgrounds are fixed
+  // light pastels in both themes, so without this the cell fell back to the
+  // page body's dark:text-slate-100 (near-white) and became unreadable in
+  // dark mode: white text on a light background.
+  return <td className={`px-4 py-3 text-right tabular-nums text-slate-700 ${bg}`}>{money(value)}</td>;
 }
 
 function EmptyState({ message }: { message: string }) {
