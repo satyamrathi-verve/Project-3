@@ -15,6 +15,7 @@ import { FinanceIcon, ledgerGridPath, calculatorPath, invoicePath } from "@/comp
 const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/", label: "Home", built: true },
   { href: "/signin", label: "Sign In", built: true },
+  { href: "/dashboard", label: "Dashboard", built: true },
   { href: "/masters/customers", label: "Customer Master", built: true },
   { href: "/masters/gl", label: "GL Master", built: true },
   { href: "/invoices", label: "Sales Invoices", built: true },
@@ -26,7 +27,6 @@ const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/reports/statement", label: "Customer Statement", built: true },
   { href: "/reports/ageing", label: "AR Ageing", built: true },
   { href: "/cashflow", label: "Cashflow Projection", built: true },
-  { href: "/dashboard", label: "Dashboard", built: true },
 ];
 
 export function Nav({ session }: { session: Session }) {
@@ -61,6 +61,16 @@ export function Nav({ session }: { session: Session }) {
           </div>
           <p className="mt-1 text-xs font-medium text-white/70">(360° AR management)</p>
         </div>
+
+        {/* Distinct CTA (not just a regular list link) so there's always a
+            one-click way back to the Dashboard from anywhere in the app. */}
+        <Link
+          href="/dashboard"
+          className="mb-3 flex items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent-dark"
+        >
+          <span aria-hidden>📊</span> Back to Dashboard
+        </Link>
+
         <div className="flex flex-col gap-1">
           {LINKS.map((l) => {
             const active = pathname === l.href;
@@ -99,10 +109,6 @@ export function Nav({ session }: { session: Session }) {
             Sign out
           </button>
         </div>
-      </div>
-      <div className="relative z-10 flex-none border-t border-white/15 p-4">
-        <p className="truncate text-base font-medium text-white">{session.name}</p>
-        <p className="truncate text-sm text-white/60">{session.email}</p>
       </div>
     </nav>
   );

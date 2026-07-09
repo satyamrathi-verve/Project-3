@@ -1,24 +1,22 @@
 "use client";
 
 /*
-  Self-contained on purpose: this screen doesn't import or modify any shared
-  component (DataTable, KpiCard, globals.css) so it can never affect how other
+  Self-contained on purpose: this screen doesn't modify any shared component
+  (DataTable, KpiCard, globals.css, Nav) so it can never affect how other
   screens in this shared repo look or behave. Every helper/table/chart below
-  is local to this file — including its own coral/peach visual identity,
-  which intentionally departs from the rest of the app's blue/slate look
-  (per explicit request to match a reference dashboard's style for this one
-  screen). Colors are inline hex, not new Tailwind theme tokens, so
-  tailwind.config.ts stays untouched too.
+  is local to this file. Visually it now matches the rest of the app: the
+  same brand navy / accent orange palette (tailwind.config.ts), bg-cream
+  cards, and PageHeader — no separate color identity like an earlier version
+  of this screen had.
 
   A few requested widgets have no backing data in this Supabase schema and we
   never add columns/tables (CLAUDE.md rule: never touch the backend):
     - "Collector" (assigned analyst) — no such field on customers/invoices.
       Omitted rather than faked; would need a real column to be honest.
-    - Year-over-year / month-over-month trend arrows (like the reference
-      image) — we have no historical AR snapshots to compute a real trend
-      from, so none are shown rather than faking one.
-  Dispute Breakdown was dropped entirely (not just hidden) — same reasoning,
-  no dispute-reason field exists anywhere in this schema.
+    - Year-over-year / month-over-month trend arrows — we have no historical
+      AR snapshots to compute a real trend from, so none are shown.
+  Dispute Breakdown was dropped entirely — same reasoning, no dispute-reason
+  field exists anywhere in this schema.
   "Customer Segment" (Enterprise/SMB) and "Customers by City" ARE derived
   below from real stored fields (credit_limit, address) — not invented.
 */
@@ -27,7 +25,6 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import Link from "next/link";
 import {
   AlertTriangle,
-  BarChart3,
   CheckCircle2,
   Clock,
   IndianRupee,
@@ -42,6 +39,7 @@ import {
 } from "lucide-react";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
+import { PageHeader } from "@/components/PageHeader";
 import type { Customer, Invoice, ReceiptAllocation, Receipt, ReminderLog, ReminderTemplate } from "@/lib/types";
 
 type RiskTier = "High" | "Medium" | "Low";
@@ -51,11 +49,12 @@ type DaysFilter = "all" | "1-30" | "31-60" | "61-90" | "91+";
 type SegmentFilter = "all" | Segment;
 type SendState = "idle" | "sending" | "sent" | "error";
 
-// Reference-image-inspired accent, scoped to this screen only (inline hex,
-// not a shared Tailwind token).
-const ACCENT = "#FF8B6E";
-const ACCENT_DARK = "#FF6A4D";
-const PAGE_BG = "#FDF6F2";
+// Same hex values as tailwind.config.ts's `brand` and `accent` tokens — kept
+// as raw hex here too since SVG fill/stroke and conic-gradient strings can't
+// reference Tailwind classes directly.
+const PRIMARY = "#23408b";
+const PRIMARY_DARK = "#182d63";
+const SECONDARY = "#f2994a";
 
 // A customer with credit_limit at/above this is treated as "Enterprise" for
 // the segment filter — a derived heuristic, not a stored field.
@@ -66,8 +65,7 @@ const ALERT_AMOUNT = 50000;
 const ALERT_DAYS = 60;
 
 // Quick-jump shortcuts to the other built screens — every link below points
-// at a route that already exists in this repo (checked against the team's
-// commits before adding this list, nothing speculative here).
+// at a route that already exists in this repo.
 const QUICK_LINKS: { href: string; label: string }[] = [
   { href: "/reports/ageing", label: "AR Ageing" },
   { href: "/reports/statement", label: "Customer Statement" },
@@ -253,14 +251,14 @@ function StatCard({
   const animated = useCountUp(value, active);
   const toneClass = tone === "danger" ? "text-red-600" : tone === "success" ? "text-emerald-600" : "text-slate-900";
   return (
-    <div className="rounded-2xl border border-slate-100 bg-cream p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+    <div className="rounded-xl border border-slate-200 bg-cream p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-        <span className="rounded-full p-1.5" style={{ backgroundColor: `${ACCENT}1A`, color: ACCENT }}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+        <span className="rounded-full p-1.5" style={{ backgroundColor: `${PRIMARY}14`, color: PRIMARY }}>
           {icon}
         </span>
       </div>
-      <p className={`mt-2 text-[26px] font-extrabold leading-none tabular-nums ${toneClass}`}>{format(animated)}</p>
+      <p className={`mt-2 text-2xl font-bold leading-tight tabular-nums ${toneClass}`}>{format(animated)}</p>
       {hint && <p className="mt-1.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );
@@ -269,8 +267,8 @@ function StatCard({
 function AgeingBarChart({ buckets, animate }: { buckets: AgeingBucket[]; animate: boolean }) {
   const max = Math.max(1, ...buckets.map((b) => b.amount));
   return (
-    <div className="rounded-2xl border border-slate-100 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <p className="mb-4 text-sm font-bold text-slate-900">AR Aging</p>
+    <div className="rounded-xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <p className="mb-4 text-sm font-semibold text-slate-900">AR Aging</p>
       <div className="space-y-3">
         {buckets.map((b, i) => (
           <div key={b.label} className="flex items-center gap-3">
@@ -285,7 +283,7 @@ function AgeingBarChart({ buckets, animate }: { buckets: AgeingBucket[]; animate
                 }}
               />
             </div>
-            <span className="w-16 flex-none text-right text-xs font-bold text-slate-800">{formatCurrency(b.amount)}</span>
+            <span className="w-16 flex-none text-right text-xs font-semibold text-slate-800">{formatCurrency(b.amount)}</span>
           </div>
         ))}
       </div>
@@ -311,12 +309,12 @@ function CashForecastChart({ points, animate }: { points: WeekPoint[]; animate: 
   const pathLength = width * 1.3;
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+    <div className="rounded-xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-bold text-slate-900">Cash Forecast — Predicted vs Actual</p>
+        <p className="text-sm font-semibold text-slate-900">Cash Forecast — Predicted vs Actual</p>
         <div className="flex items-center gap-4 text-xs text-slate-500">
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-4 rounded" style={{ backgroundColor: ACCENT }} /> Actual
+            <span className="h-2 w-4 rounded" style={{ backgroundColor: PRIMARY }} /> Actual
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2 w-4 rounded border-2 border-dashed border-slate-400" /> Predicted
@@ -328,7 +326,7 @@ function CashForecastChart({ points, animate }: { points: WeekPoint[]; animate: 
           <polyline
             points={actualPts.join(" ")}
             fill="none"
-            stroke={ACCENT}
+            stroke={PRIMARY}
             strokeWidth={2.5}
             strokeDasharray={pathLength}
             strokeDashoffset={animate ? 0 : pathLength}
@@ -347,7 +345,7 @@ function CashForecastChart({ points, animate }: { points: WeekPoint[]; animate: 
         )}
         {points.map((p, i) => (
           <g key={p.label} style={{ opacity: animate ? 1 : 0, transition: `opacity 400ms ease-out ${500 + i * 60}ms` }}>
-            {p.actual !== undefined && <circle cx={i * stepX} cy={y(p.actual)} r={3} fill={ACCENT} />}
+            {p.actual !== undefined && <circle cx={i * stepX} cy={y(p.actual)} r={3} fill={PRIMARY} />}
             {p.predicted !== undefined && <circle cx={i * stepX} cy={y(p.predicted)} r={3} fill="#94a3b8" />}
             <text x={i * stepX} y={height - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
               {p.label}
@@ -382,8 +380,8 @@ function DonutChart({
     .join(", ");
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <p className="mb-4 text-sm font-bold text-slate-900">{title}</p>
+    <div className="rounded-xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <p className="mb-4 text-sm font-semibold text-slate-900">{title}</p>
       <div className="flex items-center gap-5">
         <div
           className="relative h-28 w-28 flex-none rounded-full transition-all duration-500 ease-out"
@@ -394,7 +392,7 @@ function DonutChart({
           }}
         >
           <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-cream text-center">
-            <p className="text-sm font-extrabold leading-tight text-slate-900">{formatValue(total)}</p>
+            <p className="text-sm font-bold leading-tight text-slate-900">{formatValue(total)}</p>
             <p className="text-[9px] uppercase tracking-wide text-slate-400">Total</p>
           </div>
         </div>
@@ -403,7 +401,7 @@ function DonutChart({
             <div key={seg.label} className="flex items-center gap-2 text-xs">
               <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: seg.color }} />
               <span className="text-slate-500">{seg.label}</span>
-              <span className="font-bold text-slate-900">{formatValue(seg.value)}</span>
+              <span className="font-semibold text-slate-900">{formatValue(seg.value)}</span>
             </div>
           ))}
         </div>
@@ -414,8 +412,8 @@ function DonutChart({
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <p className="mb-4 text-sm font-bold text-slate-900">{title}</p>
+    <div className="rounded-xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
+      <p className="mb-4 text-sm font-semibold text-slate-900">{title}</p>
       {children}
     </div>
   );
@@ -451,7 +449,7 @@ function RankedBarList({
               }}
             />
           </div>
-          <span className="w-16 flex-none text-right text-xs font-bold text-slate-800">{formatValue(item.value)}</span>
+          <span className="w-16 flex-none text-right text-xs font-semibold text-slate-800">{formatValue(item.value)}</span>
         </div>
       ))}
     </div>
@@ -465,12 +463,12 @@ function MonthlyTrendChart({ points, animate }: { points: MonthPoint[]; animate:
     <div className="flex items-end gap-2" style={{ height: barArea + 44 }}>
       {points.map((p, i) => (
         <div key={p.label} className="flex flex-1 flex-col items-center justify-end gap-1.5">
-          <span className="text-[10px] font-bold text-slate-700">{formatCurrency(p.amount)}</span>
+          <span className="text-[10px] font-semibold text-slate-700">{formatCurrency(p.amount)}</span>
           <div
             className="w-full rounded-t-lg transition-[height] duration-700 ease-out"
             style={{
               height: `${animate ? Math.max(6, (p.amount / max) * barArea) : 0}px`,
-              backgroundColor: ACCENT,
+              backgroundColor: PRIMARY,
               transitionDelay: `${i * 80}ms`,
             }}
           />
@@ -492,14 +490,14 @@ function CreditUtilizationChart({ rows, animate }: { rows: CreditRow[]; animate:
     <div className="space-y-4">
       {rows.map((r, i) => {
         const pct = r.creditLimit > 0 ? (r.outstanding / r.creditLimit) * 100 : 0;
-        const barColor = pct > 100 ? "#dc2626" : pct > 75 ? "#f59e0b" : ACCENT;
+        const barColor = pct > 100 ? "#dc2626" : pct > 75 ? "#f59e0b" : PRIMARY;
         return (
           <div key={r.name}>
             <div className="mb-1 flex items-center justify-between gap-2 text-xs">
               <span className="truncate font-semibold text-slate-700" title={r.name}>
                 {r.name}
               </span>
-              <span className={`flex-none font-bold ${pct > 100 ? "text-red-600" : "text-slate-500"}`}>
+              <span className={`flex-none font-semibold ${pct > 100 ? "text-red-600" : "text-slate-500"}`}>
                 {pct.toFixed(0)}% of limit
               </span>
             </div>
@@ -531,7 +529,7 @@ function CreditUtilizationChart({ rows, animate }: { rows: CreditRow[]; animate:
   );
 }
 
-function AreaTrendChart({ points, animate, color = ACCENT }: { points: MonthPoint[]; animate: boolean; color?: string }) {
+function AreaTrendChart({ points, animate, color = PRIMARY }: { points: MonthPoint[]; animate: boolean; color?: string }) {
   const width = 600;
   const height = 180;
   const padTop = 16;
@@ -572,14 +570,14 @@ function SkeletonPanel() {
     <div className="animate-pulse space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-2xl border border-slate-100 bg-cream" />
+          <div key={i} className="h-24 rounded-xl border border-slate-200 bg-cream" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="h-56 rounded-2xl border border-slate-100 bg-cream" />
-        <div className="h-56 rounded-2xl border border-slate-100 bg-cream" />
+        <div className="h-56 rounded-xl border border-slate-200 bg-cream" />
+        <div className="h-56 rounded-xl border border-slate-200 bg-cream" />
       </div>
-      <div className="h-64 rounded-2xl border border-slate-100 bg-cream" />
+      <div className="h-64 rounded-xl border border-slate-200 bg-cream" />
     </div>
   );
 }
@@ -782,7 +780,7 @@ export default function DashboardPage() {
       else open++;
     }
     return [
-      { label: "Open", value: open, color: ACCENT },
+      { label: "Open", value: open, color: PRIMARY },
       { label: "Partial", value: partial, color: "#f59e0b" },
       { label: "Overdue", value: overdue, color: "#dc2626" },
       { label: "Paid", value: paid, color: "#10b981" },
@@ -800,13 +798,13 @@ export default function DashboardPage() {
     }
     return [
       { label: "Enterprise", value: Math.round(enterprise), color: "#64748b" },
-      { label: "SMB", value: Math.round(smb), color: ACCENT },
+      { label: "SMB", value: Math.round(smb), color: PRIMARY },
     ];
   }, [openRows]);
 
   const paymentModeDonut: DonutSegment[] = useMemo(() => {
     const MODE_LABELS: Record<string, string> = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
-    const MODE_COLORS: Record<string, string> = { cash: "#f59e0b", cheque: "#64748b", upi: ACCENT, neft: "#10b981" };
+    const MODE_COLORS: Record<string, string> = { cash: "#f59e0b", cheque: "#64748b", upi: PRIMARY, neft: "#10b981" };
     const byMode = new Map<string, number>();
     for (const r of receipts) byMode.set(r.mode, (byMode.get(r.mode) ?? 0) + r.amount);
     return Array.from(byMode.entries()).map(([mode, amount]) => ({
@@ -961,42 +959,35 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="-m-8 min-h-[calc(100%+4rem)] p-8" style={{ backgroundColor: PAGE_BG }}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-sm" style={{ backgroundColor: ACCENT }}>
-            <BarChart3 className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">AR ANALYST DASHBOARD</h1>
-            <p className="text-xs text-slate-500">Cash flow health, aging risk, and a worklist to chase it.</p>
-          </div>
-        </div>
-        {lastUpdated && (
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-slate-100 bg-cream px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
-              Last updated: {lastUpdated.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-            </span>
-            <button
-              type="button"
-              onClick={fetchAll}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
-              style={{ backgroundColor: ACCENT }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = ACCENT_DARK)}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = ACCENT)}
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Refresh
-            </button>
-          </div>
-        )}
-      </div>
+    <div>
+      <PageHeader
+        title="AR Analyst Dashboard"
+        subtitle="Cash flow health, aging risk, and a worklist to chase it."
+        action={
+          lastUpdated ? (
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-slate-200 bg-cream px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
+                Last updated: {lastUpdated.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+              <button
+                type="button"
+                onClick={fetchAll}
+                className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-dark"
+              >
+                <RefreshCw className="h-3.5 w-3.5" /> Refresh
+              </button>
+            </div>
+          ) : undefined
+        }
+      />
 
       <div className="mb-6 flex flex-wrap gap-2">
         {QUICK_LINKS.map((l) => (
           <Link
             key={l.href}
             href={l.href}
-            className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition-colors hover:bg-orange-100"
+            className="rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors"
+            style={{ borderColor: `${SECONDARY}55`, backgroundColor: `${SECONDARY}14`, color: "#9a5b1e" }}
           >
             {l.label}
           </Link>
@@ -1006,7 +997,7 @@ export default function DashboardPage() {
       {!isConfigured && <NotConfigured />}
 
       {isConfigured && error && (
-        <div className="mb-6 rounded-2xl border border-red-300 bg-red-50 p-6 text-red-800">
+        <div className="mb-6 rounded-xl border border-red-300 bg-red-50 p-6 text-red-800">
           <p className="font-semibold">Couldn&apos;t load the dashboard.</p>
           <p className="mt-1 text-sm">{error}</p>
         </div>
@@ -1029,9 +1020,7 @@ export default function DashboardPage() {
                 aria-pressed={dashTab === t.key}
                 onClick={() => setDashTab(t.key)}
                 className="rounded-full px-4 py-2 transition-colors"
-                style={
-                  dashTab === t.key ? { backgroundColor: ACCENT, color: "white" } : { color: "#64748b" }
-                }
+                style={dashTab === t.key ? { backgroundColor: PRIMARY, color: "white" } : { color: "#64748b" }}
               >
                 {t.label}
               </button>
@@ -1094,7 +1083,7 @@ export default function DashboardPage() {
 
               {uncontactedOverdueCount > 0 && (
                 <div
-                  className={`mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${revealClass(
+                  className={`mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${revealClass(
                     mounted
                   )}`}
                   style={{ transitionDelay: "160ms" }}
@@ -1117,14 +1106,13 @@ export default function DashboardPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search customer name…"
-                    className="w-full rounded-full border border-slate-200 bg-cream py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2"
-                    style={{ ["--tw-ring-color" as string]: `${ACCENT}55` }}
+                    className="w-full rounded-full border border-slate-300 bg-cream py-2 pl-9 pr-3 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                   />
                 </div>
                 <select
                   value={riskFilter}
                   onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
-                  className="rounded-full border border-slate-200 bg-cream px-3 py-2 text-sm shadow-sm outline-none"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                 >
                   <option value="all">All risk tiers</option>
                   <option value="High">High risk</option>
@@ -1134,7 +1122,7 @@ export default function DashboardPage() {
                 <select
                   value={daysFilter}
                   onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
-                  className="rounded-full border border-slate-200 bg-cream px-3 py-2 text-sm shadow-sm outline-none"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                 >
                   <option value="all">Any days past due</option>
                   <option value="1-30">1–30 days</option>
@@ -1145,7 +1133,7 @@ export default function DashboardPage() {
                 <select
                   value={segmentFilter}
                   onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
-                  className="rounded-full border border-slate-200 bg-cream px-3 py-2 text-sm shadow-sm outline-none"
+                  className="rounded-full border border-slate-300 bg-cream px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                   title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
                 >
                   <option value="all">All segments</option>
@@ -1155,23 +1143,23 @@ export default function DashboardPage() {
               </div>
 
               <div
-                className={`overflow-hidden rounded-2xl border border-slate-100 bg-cream shadow-sm ${revealClass(mounted)}`}
+                className={`overflow-hidden rounded-xl border border-slate-200 bg-cream shadow-sm ${revealClass(mounted)}`}
                 style={{ transitionDelay: "280ms" }}
               >
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-100 text-left">
+                    <tr className="border-b border-slate-200 bg-slate-50 text-left">
                       <th className="w-6 px-2 py-3" />
-                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Customer</th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Invoice #</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Customer</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Invoice #</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Amount Owed
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Days Past Due
                       </th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Risk Tier</th>
-                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Risk Tier</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">
                         Last Touchpoint
                       </th>
                     </tr>
@@ -1193,7 +1181,7 @@ export default function DashboardPage() {
                           <td className="px-2 py-3">{row.isAlert && <AlertDot />}</td>
                           <td className="px-4 py-3 text-slate-700">{row.customerName}</td>
                           <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
-                          <td className="px-4 py-3 text-right font-bold text-slate-900">
+                          <td className="px-4 py-3 text-right font-semibold text-slate-900">
                             {formatFullCurrency(row.outstanding)}
                           </td>
                           <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
@@ -1266,12 +1254,10 @@ export default function DashboardPage() {
               drawerVisible ? "translate-x-0" : "translate-x-full"
             }`}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 p-5">
+            <div className="flex items-center justify-between border-b border-slate-200 p-5">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: ACCENT }}>
-                  Collection Reminder
-                </p>
-                <h2 className="text-lg font-extrabold text-slate-900">{selectedInvoice.invoice_no}</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand">Collection Reminder</p>
+                <h2 className="text-lg font-bold text-slate-900">{selectedInvoice.invoice_no}</h2>
               </div>
               <button type="button" onClick={closeDrawer} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Close">
                 <X className="h-5 w-5" />
@@ -1333,7 +1319,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="border-t border-slate-100 p-5">
+            <div className="border-t border-slate-200 p-5">
               {(() => {
                 const state = sendState[selectedInvoice.id] ?? "idle";
                 const disabled = !selectedInvoice.customerEmail || state === "sending" || state === "sent";
@@ -1343,8 +1329,9 @@ export default function DashboardPage() {
                       type="button"
                       onClick={handleSend}
                       disabled={disabled}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                      style={{ backgroundColor: state === "sent" ? "#059669" : ACCENT }}
+                      className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        state === "sent" ? "bg-emerald-600" : "bg-brand hover:bg-brand-dark"
+                      }`}
                     >
                       {state === "sending" && <Loader2 className="h-4 w-4 animate-spin" />}
                       {state === "sent" && <CheckCircle2 className="h-4 w-4" />}
