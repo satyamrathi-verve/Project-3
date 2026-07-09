@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { supabase, isConfigured } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
@@ -62,6 +62,120 @@ function wasChasedRecently(g: CustomerGroup) {
   return Date.now() - new Date(g.lastChasedAt).getTime() <= RECENT_CHASE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+type SortKey = "customer" | "email" | "invoices" | "oldest" | "lastChased" | "outstanding";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "customer", label: "Customer" },
+  { key: "email", label: "Email" },
+  { key: "invoices", label: "Invoices" },
+  { key: "oldest", label: "Oldest Overdue" },
+  { key: "lastChased", label: "Last Chased" },
+  { key: "outstanding", label: "Outstanding" },
+];
+
+function sortValue(g: CustomerGroup, key: SortKey): string | number {
+  switch (key) {
+    case "customer":
+      return g.customer_name;
+    case "email":
+      return g.customer_email ?? "";
+    case "invoices":
+      return g.invoices.length;
+    case "oldest":
+      return g.oldestDaysOverdue;
+    case "lastChased":
+      return g.lastChasedAt ?? "";
+    case "outstanding":
+      return g.totalOutstanding;
+  }
+}
+
+function filterText(g: CustomerGroup, key: SortKey): string {
+  switch (key) {
+    case "customer":
+      return g.customer_name;
+    case "email":
+      return g.customer_email ?? "";
+    case "invoices":
+      return String(g.invoices.length);
+    case "oldest":
+      return String(g.oldestDaysOverdue);
+    case "lastChased":
+      return g.lastChasedAt ? formatDate(g.lastChasedAt) : "never";
+    case "outstanding":
+      return String(g.totalOutstanding);
+  }
+}
+
+const AGE_RANGES: { label: string; test: (days: number) => boolean }[] = [
+  { label: "Less than 15 days", test: (d) => d < 15 },
+  { label: "15–30 days", test: (d) => d >= 15 && d < 30 },
+  { label: "30–45 days", test: (d) => d >= 30 && d < 45 },
+  { label: "45–60 days", test: (d) => d >= 45 && d < 60 },
+  { label: "60–90 days", test: (d) => d >= 60 && d < 90 },
+  { label: "Only 90+ days", test: (d) => d >= 90 },
+];
+
+function downloadCustomerCsv(g: CustomerGroup) {
+  const header = "Invoice No,Invoice Date,Due Date,Outstanding\n";
+  const rows = g.invoices
+    .map((i) => `${i.invoice_no},${formatDate(i.invoice_date)},${formatDate(i.due_date)},${i.outstanding}`)
+    .join("\n");
+  const blob = new Blob([header + rows], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${g.customer_name.replace(/\s+/g, "_")}_overdue_invoices.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  return (
+    <svg
+      className={`h-3 w-3 ${active ? "text-brand" : "text-slate-400 dark:text-slate-500"}`}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      {(!active || dir === "asc") && <path d="M10 5l4 5H6l4-5z" opacity={active && dir === "asc" ? 1 : 0.5} />}
+      {(!active || dir === "desc") && (
+        <path d="M10 15l-4-5h8l-4 5z" opacity={active && dir === "desc" ? 1 : 0.5} />
+      )}
+    </svg>
+  );
+}
+
+function FilterIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      className={`h-3 w-3 ${active ? "text-brand" : "text-slate-400 dark:text-slate-500"}`}
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      <path d="M3 4a1 1 0 011-1h12a1 1 0 01.8 1.6l-4.8 6.13V16a1 1 0 01-1.45.9l-2-1A1 1 0 018 15v-4.27L3.2 4.6A1 1 0 013 4z" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 3.5c-4.4 0-7.7 3.1-9 6.5 1.3 3.4 4.6 6.5 9 6.5s7.7-3.1 9-6.5c-1.3-3.4-4.6-6.5-9-6.5zm0 10.8a4.3 4.3 0 110-8.6 4.3 4.3 0 010 8.6zm0-1.6a2.7 2.7 0 100-5.4 2.7 2.7 0 000 5.4z" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 3a1 1 0 011 1v7.59l2.3-2.3a1 1 0 111.4 1.42l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.42l2.3 2.3V4a1 1 0 011-1zM4 15a1 1 0 011 1v1h10v-1a1 1 0 112 0v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a1 1 0 011-1z" />
+    </svg>
+  );
+}
+
 export default function AutoEmailShootPage() {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
@@ -78,6 +192,11 @@ export default function AutoEmailShootPage() {
   const [view, setView] = useState<"chase" | "history">("chase");
   const [historyRows, setHistoryRows] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<SortKey, string>>>({});
+  const [openFilterColumn, setOpenFilterColumn] = useState<SortKey | null>(null);
 
   async function loadData() {
     if (!isConfigured || !supabase) {
@@ -238,10 +357,12 @@ export default function AutoEmailShootPage() {
   function selectAllSendable() {
     setSelectedIds(new Set(customerGroups.filter((g) => g.customer_email).map((g) => g.customer_id)));
   }
-  function selectOnly90Plus() {
+  function selectByAgeRange(label: string) {
+    const range = AGE_RANGES.find((r) => r.label === label);
+    if (!range) return;
     setSelectedIds(
       new Set(
-        customerGroups.filter((g) => g.customer_email && g.oldestDaysOverdue >= 90).map((g) => g.customer_id)
+        customerGroups.filter((g) => g.customer_email && range.test(g.oldestDaysOverdue)).map((g) => g.customer_id)
       )
     );
   }
@@ -277,6 +398,40 @@ export default function AutoEmailShootPage() {
     () => new Set(allDueInvoices.filter((inv) => inv.customer_email).map((inv) => inv.customer_id)).size,
     [allDueInvoices]
   );
+
+  function toggleSort(key: SortKey) {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortKey(null);
+    }
+  }
+
+  function setColumnFilter(key: SortKey, value: string) {
+    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const visibleGroups = useMemo(() => {
+    let rows = customerGroups.filter((g) =>
+      COLUMNS.every((c) => {
+        const q = (columnFilters[c.key] ?? "").trim().toLowerCase();
+        if (!q) return true;
+        return filterText(g, c.key).toLowerCase().includes(q);
+      })
+    );
+    if (sortKey) {
+      rows = [...rows].sort((a, b) => {
+        const av = sortValue(a, sortKey);
+        const bv = sortValue(b, sortKey);
+        const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+    return rows;
+  }, [customerGroups, columnFilters, sortKey, sortDir]);
 
   function buildCustomerSample(g: CustomerGroup) {
     return {
@@ -561,12 +716,23 @@ export default function AutoEmailShootPage() {
                   >
                     Select all
                   </button>
-                  <button
-                    onClick={selectOnly90Plus}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) selectByAgeRange(e.target.value);
+                      e.target.value = "";
+                    }}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                   >
-                    Only 90+ days
-                  </button>
+                    <option value="" disabled>
+                      By age range…
+                    </option>
+                    {AGE_RANGES.map((r) => (
+                      <option key={r.label} value={r.label}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
                   <button
                     onClick={selectOnlyNeverChased}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -603,100 +769,177 @@ export default function AutoEmailShootPage() {
                 </p>
               )}
 
-              <div className="flex flex-col gap-3">
-                {customerGroups.map((g) => {
-                  const bucket = ageingBucket(g.oldestDaysOverdue);
-                  const styles = AGEING_BUCKET_STYLES[bucket];
-                  const expanded = expandedId === g.customer_id;
-                  const preview = expanded ? previewFor(g) : null;
-                  return (
-                    <div
-                      key={g.customer_id}
-                      onClick={() => setExpandedId(expanded ? null : g.customer_id)}
-                      className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
-                    >
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(g.customer_id)}
-                          disabled={!g.customer_email}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleOne(g.customer_id)}
-                          className="mt-1 h-4 w-4 flex-none accent-brand"
-                        />
-                        <div className="flex-1">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-slate-900 dark:text-white">
-                                {g.customer_name}
-                              </p>
-                              <p className="text-xs text-slate-400 dark:text-slate-500">
-                                {g.customer_email ?? (
-                                  <span className="text-amber-600 dark:text-amber-400">
-                                    No email on file
-                                  </span>
-                                )}
-                              </p>
-                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {g.invoices.length} invoice{g.invoices.length === 1 ? "" : "s"}
-                              </p>
-                            </div>
-                            <div className="flex flex-none flex-col items-end gap-1">
-                              <span
-                                className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide ${styles.badge}`}
-                              >
-                                {g.oldestDaysOverdue} days overdue
-                              </span>
-                              <span className="text-xs text-slate-400 dark:text-slate-500">
-                                {g.lastChasedAt
-                                  ? `Reminded ${formatDate(g.lastChasedAt)} · ×${g.chaseCountOnLastDate}`
-                                  : "Never reminded"}
-                              </span>
-                            </div>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-brand/30 bg-brand/10 text-left dark:border-brand/40 dark:bg-brand/20">
+                      <th className="w-10 px-4 py-3" />
+                      {COLUMNS.map((c) => (
+                        <th key={c.key} className="relative whitespace-nowrap px-4 py-3">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleSort(c.key)}
+                              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-brand-dark hover:underline dark:text-blue-300"
+                            >
+                              {c.label}
+                              <SortIcon active={sortKey === c.key} dir={sortDir} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenFilterColumn(openFilterColumn === c.key ? null : c.key)
+                              }
+                              title={`Filter ${c.label}`}
+                            >
+                              <FilterIcon active={Boolean(columnFilters[c.key])} />
+                            </button>
                           </div>
-                          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                            Due Date: {formatDate(g.oldestDueDate)}
-                          </p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Outstanding: {formatCurrency(g.totalOutstanding)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {expanded && preview && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-4 cursor-default rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800"
-                        >
-                          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                            Using template
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                            {templateFor(g)?.name ?? "No matching template"}
-                          </p>
-                          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                            To
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                            {g.customer_email ?? "No email on file"}
-                          </p>
-                          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                            Subject
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                            {preview.subject}
-                          </p>
-                          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                            Body
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                            {preview.body}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                          {openFilterColumn === c.key && (
+                            <div className="absolute left-0 z-10 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-2 normal-case shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                              <input
+                                autoFocus
+                                value={columnFilters[c.key] ?? ""}
+                                onChange={(e) => setColumnFilter(c.key, e.target.value)}
+                                onBlur={() => setTimeout(() => setOpenFilterColumn(null), 150)}
+                                placeholder={`Filter ${c.label.toLowerCase()}…`}
+                                className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-normal text-slate-700 outline-none focus:border-brand dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                              />
+                            </div>
+                          )}
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-blue-300">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleGroups.length === 0 ? (
+                      <tr>
+                        <td colSpan={COLUMNS.length + 2} className="px-4 py-10 text-center text-slate-400 dark:text-slate-600">
+                          No customers match these filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      visibleGroups.map((g, i) => {
+                        const bucket = ageingBucket(g.oldestDaysOverdue);
+                        const styles = AGEING_BUCKET_STYLES[bucket];
+                        const expanded = expandedId === g.customer_id;
+                        const preview = expanded ? previewFor(g) : null;
+                        return (
+                          <Fragment key={g.customer_id}>
+                            <tr
+                              onClick={() => setExpandedId(expanded ? null : g.customer_id)}
+                              className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-brand/5 dark:border-slate-800 dark:hover:bg-slate-800 ${
+                                i % 2 === 1 ? "bg-slate-50/70 dark:bg-slate-900/60" : "dark:bg-slate-900"
+                              }`}
+                            >
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.has(g.customer_id)}
+                                  disabled={!g.customer_email}
+                                  onChange={() => toggleOne(g.customer_id)}
+                                  className="h-4 w-4 accent-brand"
+                                />
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
+                                {g.customer_name}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-300">
+                                {g.customer_email ?? (
+                                  <span className="text-amber-600 dark:text-amber-400">No email on file</span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-300">
+                                {g.invoices.length} invoice{g.invoices.length === 1 ? "" : "s"}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <span
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles.badge}`}
+                                >
+                                  {g.oldestDaysOverdue}d
+                                </span>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-slate-700 dark:text-slate-300">
+                                {g.lastChasedAt ? (
+                                  <>
+                                    {formatDate(g.lastChasedAt)}{" "}
+                                    <span className="text-slate-400 dark:text-slate-500">
+                                      ·×{g.chaseCountOnLastDate}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="text-slate-400 dark:text-slate-500">Never</span>
+                                )}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900 dark:text-white">
+                                {formatCurrency(g.totalOutstanding)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    title="View preview"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedId(expanded ? null : g.customer_id);
+                                    }}
+                                    className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand dark:text-slate-400 dark:hover:bg-slate-700"
+                                  >
+                                    <EyeIcon />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Download overdue invoices (CSV)"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      downloadCustomerCsv(g);
+                                    }}
+                                    className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand dark:text-slate-400 dark:hover:bg-slate-700"
+                                  >
+                                    <DownloadIcon />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {expanded && preview && (
+                              <tr className="border-b border-slate-100 dark:border-slate-800">
+                                <td colSpan={COLUMNS.length + 2} className="bg-slate-50 px-4 py-4 dark:bg-slate-800">
+                                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    Using template
+                                  </p>
+                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
+                                    {templateFor(g)?.name ?? "No matching template"}
+                                  </p>
+                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    To
+                                  </p>
+                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
+                                    {g.customer_email ?? "No email on file"}
+                                  </p>
+                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    Subject
+                                  </p>
+                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
+                                    {preview.subject}
+                                  </p>
+                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    Body
+                                  </p>
+                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                                    {preview.body}
+                                  </p>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
