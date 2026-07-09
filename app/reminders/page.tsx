@@ -345,7 +345,7 @@ export default function ReminderTemplatePage() {
                   onClick={() => setMode("edit")}
                   className={
                     mode === "edit"
-                      ? "rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark dark:border-brand dark:bg-brand/20 dark:text-blue-300"
+                      ? "rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark dark:border-brand dark:bg-brand/20 dark:text-brand"
                       : "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                   }
                 >

@@ -39,23 +39,23 @@ export const AGEING_BUCKET_STYLES: Record<
   { badge: string; dot: string; label: string }
 > = {
   "0-30": {
-    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    dot: "bg-amber-400",
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    dot: "bg-emerald-500",
     label: "0–30 days",
   },
   "31-60": {
-    badge: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-    dot: "bg-orange-500",
+    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+    dot: "bg-yellow-400",
     label: "31–60 days",
   },
   "61-90": {
-    badge: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-    dot: "bg-rose-500",
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    dot: "bg-orange-500",
     label: "61–90 days",
   },
   "90+": {
     badge: "bg-red-200 text-red-800 dark:bg-red-950 dark:text-red-300",
-    dot: "bg-red-700",
+    dot: "bg-red-600",
     label: "90+ days",
   },
 };

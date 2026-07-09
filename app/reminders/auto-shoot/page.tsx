@@ -176,6 +176,23 @@ function DownloadIcon() {
   );
 }
 
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className ?? "h-4 w-4"} viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+      <circle cx="8.5" cy="8.5" r="5.5" strokeWidth="1.5" />
+      <path d="M17 17l-4-4" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+      <path d="M5 5l10 10M15 5L5 15" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function AutoEmailShootPage() {
   const [loading, setLoading] = useState(true);
   const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
@@ -195,8 +212,9 @@ export default function AutoEmailShootPage() {
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [columnFilters, setColumnFilters] = useState<Partial<Record<SortKey, string>>>({});
+  const [columnFilters, setColumnFilters] = useState<Partial<Record<SortKey, Set<string>>>>({});
   const [openFilterColumn, setOpenFilterColumn] = useState<SortKey | null>(null);
+  const [filterSearch, setFilterSearch] = useState("");
 
   async function loadData() {
     if (!isConfigured || !supabase) {
@@ -410,16 +428,38 @@ export default function AutoEmailShootPage() {
     }
   }
 
-  function setColumnFilter(key: SortKey, value: string) {
-    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  function uniqueValuesFor(key: SortKey): string[] {
+    return Array.from(new Set(customerGroups.map((g) => filterText(g, key)))).sort();
+  }
+
+  function toggleFilterValue(key: SortKey, value: string) {
+    setColumnFilters((prev) => {
+      const current = prev[key] ?? new Set(uniqueValuesFor(key));
+      const next = new Set(current);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return { ...prev, [key]: next };
+    });
+  }
+
+  function selectAllForColumn(key: SortKey) {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
+
+  function clearColumnFilter(key: SortKey) {
+    setColumnFilters((prev) => ({ ...prev, [key]: new Set() }));
   }
 
   const visibleGroups = useMemo(() => {
     let rows = customerGroups.filter((g) =>
       COLUMNS.every((c) => {
-        const q = (columnFilters[c.key] ?? "").trim().toLowerCase();
-        if (!q) return true;
-        return filterText(g, c.key).toLowerCase().includes(q);
+        const selected = columnFilters[c.key];
+        if (!selected) return true;
+        return selected.has(filterText(g, c.key));
       })
     );
     if (sortKey) {
@@ -545,7 +585,7 @@ export default function AutoEmailShootPage() {
         title="Auto Email Shoot"
         subtitle={
           view === "chase"
-            ? "One email per overdue customer, covering all their overdue invoices. Click a row to preview."
+            ? "One email per overdue customer, covering all their overdue invoices. Click a row to view invoices."
             : "Every reminder ever logged, newest first."
         }
         action={
@@ -673,7 +713,7 @@ export default function AutoEmailShootPage() {
             <button
               onClick={handleRunStatementShoot}
               disabled={runningStatement || customersWithDuesCount === 0}
-              className="flex-none rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand/20 disabled:opacity-50 dark:border-brand dark:bg-brand/20 dark:text-blue-300"
+              className="flex-none rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand/20 disabled:opacity-50 dark:border-brand dark:bg-brand/20 dark:text-brand"
             >
               {runningStatement ? "Running…" : "Run now"}
             </button>
@@ -780,36 +820,108 @@ export default function AutoEmailShootPage() {
                             <button
                               type="button"
                               onClick={() => toggleSort(c.key)}
-                              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-brand-dark hover:underline dark:text-blue-300"
+                              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-brand-dark hover:underline dark:text-brand"
                             >
                               {c.label}
                               <SortIcon active={sortKey === c.key} dir={sortDir} />
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setOpenFilterColumn(openFilterColumn === c.key ? null : c.key)
-                              }
+                              onClick={() => {
+                                setFilterSearch("");
+                                setOpenFilterColumn(openFilterColumn === c.key ? null : c.key);
+                              }}
                               title={`Filter ${c.label}`}
                             >
-                              <FilterIcon active={Boolean(columnFilters[c.key])} />
+                              <FilterIcon
+                                active={Boolean(
+                                  columnFilters[c.key] && columnFilters[c.key]!.size < uniqueValuesFor(c.key).length
+                                )}
+                              />
                             </button>
                           </div>
-                          {openFilterColumn === c.key && (
-                            <div className="absolute left-0 z-10 mt-2 w-48 rounded-lg border border-slate-200 bg-white p-2 normal-case shadow-lg dark:border-slate-700 dark:bg-slate-800">
-                              <input
-                                autoFocus
-                                value={columnFilters[c.key] ?? ""}
-                                onChange={(e) => setColumnFilter(c.key, e.target.value)}
-                                onBlur={() => setTimeout(() => setOpenFilterColumn(null), 150)}
-                                placeholder={`Filter ${c.label.toLowerCase()}…`}
-                                className="w-full rounded border border-slate-300 px-2 py-1 text-xs font-normal text-slate-700 outline-none focus:border-brand dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                              />
-                            </div>
-                          )}
+                          {openFilterColumn === c.key &&
+                            (() => {
+                              const allValues = uniqueValuesFor(c.key);
+                              const selected = columnFilters[c.key] ?? new Set(allValues);
+                              const q = filterSearch.trim().toLowerCase();
+                              const shownValues = q
+                                ? allValues.filter((v) => v.toLowerCase().includes(q))
+                                : allValues;
+                              return (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute left-0 z-20 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-3 normal-case shadow-lg dark:border-slate-700 dark:bg-slate-800"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="relative flex-1">
+                                      <input
+                                        autoFocus
+                                        value={filterSearch}
+                                        onChange={(e) => setFilterSearch(e.target.value)}
+                                        placeholder="Search…"
+                                        className="w-full rounded border border-slate-300 py-1.5 pl-2 pr-7 text-xs font-normal text-slate-700 outline-none focus:border-brand dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                                      />
+                                      <SearchIcon className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setOpenFilterColumn(null)}
+                                      title="Close"
+                                      className="ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                                    >
+                                      <CloseIcon />
+                                    </button>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between text-xs">
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => selectAllForColumn(c.key)}
+                                        className="font-medium text-brand hover:underline"
+                                      >
+                                        Select all {allValues.length}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => clearColumnFilter(c.key)}
+                                        className="font-medium text-slate-500 hover:underline dark:text-slate-400"
+                                      >
+                                        Clear
+                                      </button>
+                                    </div>
+                                    <span className="text-slate-400 dark:text-slate-500">
+                                      Displaying {visibleGroups.length}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 max-h-48 overflow-y-auto">
+                                    {shownValues.length === 0 ? (
+                                      <p className="px-1 py-2 text-xs text-slate-400 dark:text-slate-500">
+                                        No matches.
+                                      </p>
+                                    ) : (
+                                      shownValues.map((v) => (
+                                        <label
+                                          key={v}
+                                          className="flex cursor-pointer items-center gap-2 rounded px-1 py-1.5 text-xs font-normal text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={selected.has(v)}
+                                            onChange={() => toggleFilterValue(c.key, v)}
+                                            className="h-3.5 w-3.5 accent-brand"
+                                          />
+                                          {v || <span className="italic text-slate-400">(empty)</span>}
+                                        </label>
+                                      ))
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-blue-300">
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-brand">
                         Actions
                       </th>
                     </tr>
@@ -826,7 +938,6 @@ export default function AutoEmailShootPage() {
                         const bucket = ageingBucket(g.oldestDaysOverdue);
                         const styles = AGEING_BUCKET_STYLES[bucket];
                         const expanded = expandedId === g.customer_id;
-                        const preview = expanded ? previewFor(g) : null;
                         return (
                           <Fragment key={g.customer_id}>
                             <tr
@@ -881,7 +992,7 @@ export default function AutoEmailShootPage() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     type="button"
-                                    title="View preview"
+                                    title="View invoices"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setExpandedId(expanded ? null : g.customer_id);
@@ -904,33 +1015,53 @@ export default function AutoEmailShootPage() {
                                 </div>
                               </td>
                             </tr>
-                            {expanded && preview && (
+                            {expanded && (
                               <tr className="border-b border-slate-100 dark:border-slate-800">
                                 <td colSpan={COLUMNS.length + 2} className="bg-slate-50 px-4 py-4 dark:bg-slate-800">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                    Using template
+                                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                    Overdue invoices for {g.customer_name}
                                   </p>
-                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                                    {templateFor(g)?.name ?? "No matching template"}
-                                  </p>
-                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                    To
-                                  </p>
-                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                                    {g.customer_email ?? "No email on file"}
-                                  </p>
-                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                    Subject
-                                  </p>
-                                  <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                                    {preview.subject}
-                                  </p>
-                                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                                    Body
-                                  </p>
-                                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                                    {preview.body}
-                                  </p>
+                                  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="border-b border-slate-200 bg-slate-100 text-left dark:border-slate-700 dark:bg-slate-800">
+                                          <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Invoice No.
+                                          </th>
+                                          <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Invoice Date
+                                          </th>
+                                          <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Due Date
+                                          </th>
+                                          <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                            Outstanding
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {g.invoices.map((inv) => (
+                                          <tr
+                                            key={inv.id}
+                                            className="border-b border-slate-100 last:border-0 dark:border-slate-800"
+                                          >
+                                            <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">
+                                              {inv.invoice_no}
+                                            </td>
+                                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                                              {formatDate(inv.invoice_date)}
+                                            </td>
+                                            <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                                              {formatDate(inv.due_date)}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-medium text-slate-800 dark:text-slate-100">
+                                              {formatCurrency(inv.outstanding)}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </td>
                               </tr>
                             )}
