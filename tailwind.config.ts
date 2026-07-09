@@ -11,12 +11,13 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          // App-wide coral accent (matches the Dashboard's reference-image
-          // palette), applied everywhere via this one token.
-          DEFAULT: "#FF6A4D",
-          dark: "#E5502F",
+          // Verve Advisory's official navy (sampled from the real logo) —
+          // primary blue accent across the whole app.
+          DEFAULT: "#23408b",
+          dark: "#182d63",
         },
         accent: {
+          // Secondary orange accent, paired with brand blue on white.
           DEFAULT: "#f2994a",
           dark: "#c2660a",
         },

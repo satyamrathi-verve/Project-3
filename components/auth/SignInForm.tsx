@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AR360Logo } from "@/components/AR360Logo";
 import { FormField, inputClass } from "@/components/FormField";
 import { LoginBackground } from "@/components/auth/LoginBackground";
 import {
@@ -146,11 +147,9 @@ export function SignInForm({ onSuccess }: { onSuccess: (session: Session) => voi
       {/* Login card */}
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-white/95 p-8 shadow-2xl ring-1 ring-black/5 backdrop-blur">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white shadow-md">
-            AR
-          </div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-brand">Verve</p>
-          <h1 className="text-xl font-bold text-slate-900">AR Manager</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/verve-logo.png" alt="Verve Advisory" className="mb-3 h-10 w-auto" />
+          <AR360Logo className="h-7" />
           <p className="mt-1 text-sm text-slate-500">Welcome back. Sign in to continue.</p>
         </div>
 

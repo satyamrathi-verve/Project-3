@@ -713,7 +713,7 @@ export default function AutoEmailShootPage() {
             <button
               onClick={handleRunStatementShoot}
               disabled={runningStatement || customersWithDuesCount === 0}
-              className="flex-none rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand/20 disabled:opacity-50 dark:border-brand dark:bg-brand/20 dark:text-brand"
+              className="flex-none rounded-lg border border-brand bg-brand/10 px-4 py-2 text-sm font-medium text-brand-dark hover:bg-brand/20 disabled:opacity-50 dark:border-brand dark:bg-brand/20 dark:text-blue-300"
             >
               {runningStatement ? "Running…" : "Run now"}
             </button>
@@ -820,7 +820,7 @@ export default function AutoEmailShootPage() {
                             <button
                               type="button"
                               onClick={() => toggleSort(c.key)}
-                              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-brand-dark hover:underline dark:text-brand"
+                              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-brand-dark hover:underline dark:text-blue-300"
                             >
                               {c.label}
                               <SortIcon active={sortKey === c.key} dir={sortDir} />
@@ -921,7 +921,7 @@ export default function AutoEmailShootPage() {
                             })()}
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-brand">
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-blue-300">
                         Actions
                       </th>
                     </tr>

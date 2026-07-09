@@ -50,7 +50,7 @@ export function DataTable<T extends { id: string }>({
           {columns.map((c) => (
             <th
               key={c.key}
-              className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-brand ${c.className ?? ""}`}
+              className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark dark:text-blue-300 ${c.className ?? ""}`}
               style={
                 c.accentColor
                   ? { backgroundColor: hexToRgba(c.accentColor, 0.16), borderBottom: `2px solid ${c.accentColor}` }
