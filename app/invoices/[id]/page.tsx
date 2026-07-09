@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { Printer } from "lucide-react";
 import { supabase, isConfigured } from "@/lib/supabase";
 import type { Company, Customer, Invoice, InvoiceItem } from "@/lib/types";
 import { NotConfigured } from "@/components/NotConfigured";
 import { money, formatDate } from "@/lib/format";
 import { effectiveStatus, overdueDays, STATUS_LABEL, STATUS_BADGE } from "@/lib/invoiceStatus";
+import { rupeesInWords } from "@/lib/numberToWords";
 
 type InvoiceWithCustomer = Invoice & { customers: Customer | null };
 
@@ -101,9 +103,18 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="mx-auto max-w-4xl">
-      <Link href="/invoices" className="mb-4 inline-block text-sm font-medium text-brand hover:underline">
-        ← Back to Sales Invoices
-      </Link>
+      <div className="mb-4 flex items-center justify-between">
+        <Link href="/invoices" className="inline-block text-sm font-medium text-brand hover:underline">
+          ← Back to Sales Invoices
+        </Link>
+        <Link
+          href={`/invoices/${invoice.id}/print`}
+          className="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-dark"
+        >
+          <Printer className="h-4 w-4" />
+          Print Invoice
+        </Link>
+      </div>
 
       {/* Header: our company (the "invoice header") on the left, this invoice's
           identity and status on the right. */}
@@ -114,6 +125,12 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
           {company?.address && <p className="mt-1 text-sm text-slate-500">{company.address}</p>}
           <p className="mt-1 text-sm text-slate-500">
             {[company?.gstin && `GSTIN ${company.gstin}`, company?.email, company?.phone].filter(Boolean).join(" · ")}
+          </p>
+          {/* CIN isn't a tracked field anywhere in this schema (no column, no
+              migration) — shown as a static placeholder rather than a fake
+              value, same honesty rule as the rest of this app. */}
+          <p className="mt-1 text-sm text-slate-500">
+            PAN {company?.pan ?? "—"} · CIN —
           </p>
         </div>
 
@@ -155,6 +172,9 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
               <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark">
                 Description
               </th>
+              <th className="whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wide text-brand-dark">
+                HSN/SAC
+              </th>
               <th className="whitespace-nowrap px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-brand-dark">
                 Qty
               </th>
@@ -169,7 +189,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
           <tbody>
             {items.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
                   No line items on this invoice.
                 </td>
               </tr>
@@ -180,6 +200,7 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
                   className={`border-b border-slate-100 last:border-0 ${i % 2 === 1 ? "bg-cream-dim/70" : ""}`}
                 >
                   <td className="px-4 py-3 text-slate-700">{item.description}</td>
+                  <td className="px-4 py-3 text-slate-500">{item.hsn_sac ?? "—"}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{item.qty}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{money(item.rate)}</td>
                   <td className="px-4 py-3 text-right font-medium text-slate-900">{money(item.amount)}</td>
@@ -190,32 +211,74 @@ export default function InvoiceViewPage({ params }: { params: { id: string } }) 
         </table>
       </div>
 
-      {/* Money summary */}
-      <div className="ml-auto max-w-sm rounded-xl border border-slate-200 bg-cream p-6 shadow-sm">
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-slate-500">Subtotal</dt>
-            <dd className="text-slate-700">{money(invoice.subtotal)}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-slate-500">Tax{taxRate !== null ? ` (${taxRate}%)` : ""}</dt>
-            <dd className="text-slate-700">{money(invoice.tax_amount)}</dd>
-          </div>
-          <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-semibold text-slate-900">
-            <dt>Total</dt>
-            <dd>{money(invoice.total)}</dd>
-          </div>
-          <div className="flex justify-between pt-2">
-            <dt className="text-slate-500">Amount Received</dt>
-            <dd className="text-emerald-600">{money(received)}</dd>
-          </div>
-          <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold">
-            <dt className="text-slate-900">Amount Outstanding</dt>
-            <dd className={outstanding > 0 ? "text-rose-600" : "text-emerald-600"}>
-              {outstanding > 0 ? money(outstanding) : "Paid in full"}
-            </dd>
-          </div>
-        </dl>
+      {/* Money summary, with bank details anchored bottom-left of it */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="rounded-xl border border-slate-200 bg-cream p-6 shadow-sm sm:max-w-xs">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bank Details</p>
+          <dl className="mt-2 space-y-1 text-sm text-slate-600">
+            <div className="flex justify-between gap-4">
+              <dt>Bank Name</dt>
+              <dd className="text-right text-slate-900">{company?.bank_name ?? "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>Account Number</dt>
+              <dd className="text-right text-slate-900">{company?.bank_account_no ?? "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>IFSC Code</dt>
+              <dd className="text-right text-slate-900">{company?.bank_ifsc ?? "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt>Account Name</dt>
+              <dd className="text-right text-slate-900">{company?.name ?? "—"}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="w-full rounded-xl border border-slate-200 bg-cream p-6 shadow-sm sm:max-w-sm">
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Subtotal</dt>
+              <dd className="text-slate-700">{money(invoice.subtotal)}</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Tax{taxRate !== null ? ` (${taxRate}%)` : ""}</dt>
+              <dd className="text-slate-700">{money(invoice.tax_amount)}</dd>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-semibold text-slate-900">
+              <dt>Total</dt>
+              <dd>{money(invoice.total)}</dd>
+            </div>
+            <div className="flex justify-between pt-2">
+              <dt className="text-slate-500">Amount Received</dt>
+              <dd className="text-emerald-600">{money(received)}</dd>
+            </div>
+            <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold">
+              <dt className="text-slate-900">Amount Outstanding</dt>
+              <dd className={outstanding > 0 ? "text-rose-600" : "text-emerald-600"}>
+                {outstanding > 0 ? money(outstanding) : "Paid in full"}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-3 border-t border-slate-200 pt-3 text-xs italic text-slate-500">
+            Amount in words: {rupeesInWords(invoice.total)}
+          </p>
+        </div>
+      </div>
+
+      {/* Terms on the left, signatory placeholder bottom-right */}
+      <div className="mt-6 flex flex-col gap-6 border-t border-slate-200 pt-6 sm:flex-row sm:items-end sm:justify-between">
+        <div className="sm:max-w-md">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms &amp; Conditions</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {company?.terms_conditions?.trim() ||
+              "Payment due by the invoice due date. Interest may apply on overdue balances. Goods once sold are not returnable. All disputes subject to local jurisdiction."}
+          </p>
+        </div>
+        <div className="flex-none text-right">
+          <p className="mb-8 text-sm font-medium text-slate-700">For {company?.name ?? "Verve Advisory Pvt Ltd"}</p>
+          <p className="border-t border-slate-400 pt-1 text-sm text-slate-600">Authorized Signatory</p>
+        </div>
       </div>
     </div>
   );

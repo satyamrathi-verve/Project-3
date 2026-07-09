@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Printer } from "lucide-react";
 import { supabase, isConfigured } from "@/lib/supabase";
 import type { Invoice, InvoiceStatus } from "@/lib/types";
 import { DataTable, type Column } from "@/components/DataTable";
@@ -167,6 +168,22 @@ export default function InvoiceListPage() {
           </span>
         );
       },
+    },
+    {
+      key: "actions",
+      header: "",
+      className: "text-right",
+      render: (i) => (
+        <Link
+          href={`/invoices/${i.id}/print`}
+          target="_blank"
+          title={`Print ${i.invoice_no}`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-brand dark:text-slate-500 dark:hover:bg-slate-800"
+        >
+          <Printer className="h-4 w-4" />
+        </Link>
+      ),
     },
   ];
 

@@ -104,6 +104,19 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
 
   return (
     <div className="mx-auto max-w-4xl print:max-w-none">
+      {/*
+        The shared @media print rule in globals.css sets @page to landscape
+        (tuned for the AR Ageing report's wide table) — that's the wrong
+        orientation for a standard invoice document. Rather than change that
+        shared rule and risk breaking other reports' print layout, this page
+        ships its own @page override. It's the last @page in document order,
+        so it wins the cascade for this route only.
+      */}
+      <style>{`
+        @media print {
+          @page { size: A4 portrait; margin: 12mm; }
+        }
+      `}</style>
       <div className="mb-6 flex justify-end print:hidden">
         <button
           onClick={() => window.print()}
