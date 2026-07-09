@@ -405,8 +405,8 @@ export default function AgeingReportPage() {
   return (
     <div className="font-sans">
       <div className="mb-6">
-        <h1 className="text-[28px] font-bold leading-tight text-slate-900">Accounts Receivable Ageing Report</h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <h1 className="text-[28px] font-bold leading-tight text-slate-900 dark:text-slate-100">Accounts Receivable Ageing Report</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           One row per customer, sorted so the ones who need a call today rise to the top.
         </p>
       </div>

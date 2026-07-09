@@ -14,7 +14,6 @@ import { FinanceIcon, ledgerGridPath, calculatorPath, invoicePath } from "@/comp
 */
 const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/signin", label: "Sign In", built: true },
-  { href: "/dashboard", label: "Dashboard", built: true },
   { href: "/masters/customers", label: "Customer Master", built: true },
   { href: "/masters/gl", label: "GL Master", built: true },
   { href: "/invoices", label: "Sales Invoices", built: true },
