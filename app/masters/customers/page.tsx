@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, isConfigured } from "@/lib/supabase";
 import type { Customer } from "@/lib/types";
 import { DataTable, type Column } from "@/components/DataTable";
 import { FormField, inputClass } from "@/components/FormField";
 import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
+import { avatarColor } from "@/lib/avatarColor";
 
 /* The shape of the add/edit form. Kept as strings because that's what inputs give us. */
 interface FormState {
@@ -43,24 +44,18 @@ function formFor(c: Customer): FormState {
 
 const money = (n: number) => `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-/* A small rotating palette so each customer's initial gets a distinct, consistent
-   colour (picked deterministically from their code, not randomly on each render). */
-const AVATAR_PALETTE = [
-  "bg-sky-100 text-sky-700",
-  "bg-violet-100 text-violet-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-indigo-100 text-indigo-700",
-  "bg-teal-100 text-teal-700",
-  "bg-fuchsia-100 text-fuchsia-700",
-];
-
-function avatarColor(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
-}
+type GstStatus = "Registered" | "Unregistered";
+const gstStatus = (c: Customer): GstStatus => (c.gstin && c.gstin.trim() ? "Registered" : "Unregistered");
+const GST_CHIP_ACTIVE: Record<GstStatus, string> = {
+  Registered: "bg-emerald-600 text-white",
+  Unregistered: "bg-slate-500 text-white",
+};
+/* Tinted even when not ticked, so the filter row reads as colour-coded at a
+   glance — not just after you click something. */
+const GST_CHIP_INACTIVE: Record<GstStatus, string> = {
+  Registered: "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+  Unregistered: "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100",
+};
 
 export default function CustomerMasterPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -68,6 +63,9 @@ export default function CustomerMasterPage() {
   const [netReceivable, setNetReceivable] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [gstTicks, setGstTicks] = useState<Set<GstStatus>>(new Set());
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -122,6 +120,30 @@ export default function CustomerMasterPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  function toggleGst(s: GstStatus) {
+    setGstTicks((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return customers.filter((c) => {
+      const haystack = [c.name, c.contact_person, c.address, c.email, c.phone]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const matchesSearch = !q || haystack.includes(q);
+      const matchesGst = gstTicks.size === 0 || gstTicks.has(gstStatus(c));
+      return matchesSearch && matchesGst;
+    });
+  }, [customers, search, gstTicks]);
+
+  const filtersActive = search.trim() !== "" || gstTicks.size > 0;
 
   function openAdd() {
     setEditingId(null);
@@ -200,7 +222,6 @@ export default function CustomerMasterPage() {
     {
       key: "name",
       header: "Customer Name",
-      filter: { type: "text" },
       render: (c) => (
         <div className="flex items-center gap-2.5">
           <span
@@ -212,38 +233,25 @@ export default function CustomerMasterPage() {
         </div>
       ),
     },
-    {
-      key: "city",
-      header: "Location",
-      filter: { type: "select" },
-      filterValue: (c) => c.address ?? "",
-      render: (c) => c.address ?? "—",
-    },
-    {
-      key: "contact_person",
-      header: "Contact Person",
-      filter: { type: "text" },
-      render: (c) => c.contact_person ?? "—",
-    },
+    { key: "city", header: "Location", render: (c) => c.address ?? "—" },
+    { key: "contact_person", header: "Contact Person", render: (c) => c.contact_person ?? "—" },
     { key: "email", header: "Email ID", render: (c) => c.email ?? "—" },
     { key: "phone", header: "Contact Number", render: (c) => c.phone ?? "—" },
     {
       key: "gst_treatment",
       header: "GST Treatment",
-      filter: { type: "select" },
       /* Derived, not stored: this schema only has a raw gstin, no real treatment
          field (Regular / Composition / SEZ / Consumer, etc). "Registered" here just
          means a GSTIN is on file. */
-      filterValue: (c) => (c.gstin && c.gstin.trim() ? "Registered" : "Unregistered"),
       render: (c) => {
-        const registered = Boolean(c.gstin && c.gstin.trim());
+        const registered = gstStatus(c) === "Registered";
         return (
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
               registered ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
             }`}
           >
-            {registered ? "Registered" : "Unregistered"}
+            {gstStatus(c)}
           </span>
         );
       },
@@ -307,6 +315,45 @@ export default function CustomerMasterPage() {
           </button>
         </div>
       )}
+
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, contact, location, email or phone…"
+          className="w-full flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand focus:ring-1 focus:ring-brand sm:w-auto"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          {(["Registered", "Unregistered"] as GstStatus[]).map((s) => {
+            const active = gstTicks.has(s);
+            return (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggleGst(s)}
+                aria-pressed={active}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  active ? GST_CHIP_ACTIVE[s] : GST_CHIP_INACTIVE[s]
+                }`}
+              >
+                {s}
+              </button>
+            );
+          })}
+        </div>
+        {filtersActive && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setGstTicks(new Set());
+            }}
+            className="text-xs font-medium text-brand hover:underline"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {formOpen && (
         <form onSubmit={save} className="mb-6 rounded-xl border border-slate-200 bg-white p-6">
@@ -379,9 +426,17 @@ export default function CustomerMasterPage() {
         </div>
       ) : (
         <>
-          <DataTable columns={columns} rows={customers} empty="No customers yet. Click Add Customer to create the first one." />
+          <DataTable
+            columns={columns}
+            rows={filtered}
+            empty={
+              filtersActive
+                ? "No customers match your search or filters."
+                : "No customers yet. Click Add Customer to create the first one."
+            }
+          />
           <p className="mt-3 text-sm text-slate-500">
-            {customers.length} {customers.length === 1 ? "customer" : "customers"}
+            Showing {filtered.length} of {customers.length} {customers.length === 1 ? "customer" : "customers"}
           </p>
         </>
       )}
