@@ -23,3 +23,34 @@ body {
   transform-origin: bottom;
   animation: bar-rise 1s ease-out both;
 }
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body,
+  main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .print-scroll {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  table {
+    break-inside: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  tr {
+    break-inside: avoid;
+  }
+}

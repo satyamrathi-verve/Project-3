@@ -20,7 +20,7 @@ const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/upload", label: "Upload Report", built: true },
   { href: "/reminders", label: "AR Followup", built: false },
   { href: "/reports/statement", label: "Customer Statement", built: false },
-  { href: "/reports/ageing", label: "AR Ageing", built: false },
+  { href: "/reports/ageing", label: "AR Ageing", built: true },
   { href: "/cashflow", label: "Cashflow Projection", built: false },
   { href: "/dashboard", label: "Dashboard", built: false },
 ];
@@ -29,7 +29,7 @@ export function Nav({ session }: { session: Session }) {
   const pathname = usePathname();
 
   return (
-    <nav className="flex h-full w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
+    <nav className="no-print flex h-full w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
       <div className="mb-4 px-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-brand">Verve</p>
         <h1 className="text-lg font-bold text-slate-900">AR Manager</h1>

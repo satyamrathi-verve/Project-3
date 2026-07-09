@@ -16,10 +16,16 @@ export function DataTable<T extends { id: string }>({
   columns,
   rows,
   empty = "Nothing here yet.",
+  rowClassName,
+  footer,
 }: {
   columns: Column<T>[];
   rows: T[];
   empty?: string;
+  /** Optional per-row class, e.g. to highlight overdue or high-risk rows. */
+  rowClassName?: (row: T) => string;
+  /** Optional <tr> rendered in a <tfoot>, e.g. a totals row. */
+  footer?: ReactNode;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
@@ -42,7 +48,10 @@ export function DataTable<T extends { id: string }>({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+              <tr
+                key={row.id}
+                className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${rowClassName?.(row) ?? ""}`}
+              >
                 {columns.map((c) => (
                   <td key={c.key} className={`px-4 py-3 text-slate-700 ${c.className ?? ""}`}>
                     {c.render ? c.render(row) : String((row as Record<string, unknown>)[c.key] ?? "")}
@@ -52,6 +61,7 @@ export function DataTable<T extends { id: string }>({
             ))
           )}
         </tbody>
+        {footer && <tfoot>{footer}</tfoot>}
       </table>
     </div>
   );
