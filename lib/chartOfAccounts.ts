@@ -186,3 +186,35 @@ export const ACCOUNT_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
 
 /** Account types allowed by gl_accounts.type (DB check constraint). */
 export const ACCOUNT_TYPES = ["asset", "liability", "income", "expense"] as const;
+
+/**
+ * The 8 "GL Group" labels used in the Add/Edit account forms — finer-grained
+ * than gl_accounts.type (which only has 4 values), so each maps to a DB type
+ * plus the parent_group values that belong under it. Category/Sub-category
+ * dropdowns filter PARENT_GROUPS down to `categories` for the selected group.
+ */
+export interface GLGroupDef {
+  label: string;
+  type: GLAccount["type"];
+  /** parent_group values offered once this GL Group is selected. */
+  categories: string[];
+}
+
+export const GL_GROUPS: GLGroupDef[] = [
+  { label: "Asset", type: "asset", categories: ["Current Assets", "Fixed Assets", "Accumulated Depreciation"] },
+  { label: "Liability", type: "liability", categories: ["Current Liabilities", "Long-Term Liabilities"] },
+  { label: "Equity", type: "liability", categories: ["Equity"] },
+  { label: "Revenue", type: "income", categories: ["Revenue"] },
+  { label: "COGS", type: "expense", categories: ["Cost of Goods Sold"] },
+  { label: "Expense", type: "expense", categories: ["Operating Expenses"] },
+  { label: "Other Income", type: "income", categories: ["Other Income"] },
+  { label: "Other Expense", type: "expense", categories: ["Other Expenses"] },
+];
+
+/** Finds the GL Group whose type+categories match an account (for editing existing rows). */
+export function glGroupForAccount(account: Pick<GLAccount, "type" | "parent_group">): GLGroupDef | undefined {
+  return (
+    GL_GROUPS.find((g) => g.type === account.type && g.categories.includes(account.parent_group ?? "")) ??
+    GL_GROUPS.find((g) => g.type === account.type)
+  );
+}
