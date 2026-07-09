@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearSession, type Session } from "@/lib/auth";
@@ -13,6 +13,13 @@ import { ThemeToggle } from "@/components/ThemeToggle";
   your team builds. Each unbuilt screen shows a "build me" tag. When you finish a
   screen, flip its `built` to true (and point `href` at the route you created) so it
   turns into a real link.
+
+  Auto-hide: the sidebar rests as a slim icon rail and expands on hover (a
+  slim rail rather than sliding fully off-screen, so there's always a visible,
+  reachable strip to hover back onto — hiding completely would mean the user
+  has to remember an invisible edge to trigger it). "Pin open" overrides that
+  and keeps it expanded regardless of hover, for anyone doing heavy in-app
+  navigation who doesn't want it collapsing on them.
 */
 const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/", label: "Home", built: true },
@@ -36,7 +43,8 @@ const HEADER_GRADIENT = `linear-gradient(135deg, ${hexToRgba(colorForIndex(0), 0
   0.1
 )}, ${hexToRgba(colorForIndex(4), 0.1)}, ${hexToRgba(colorForIndex(6), 0.1)})`;
 
-const COLLAPSE_KEY = "ar-manager-nav-collapsed";
+const PIN_KEY = "ar-manager-nav-pinned";
+const HOVER_COLLAPSE_DELAY_MS = 300;
 
 function initials(label: string) {
   return label
@@ -49,16 +57,39 @@ function initials(label: string) {
 
 export function Nav({ session }: { session: Session }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "true");
-  }, []);
+  const expanded = pinned || hovering;
 
-  function toggleCollapsed() {
-    const next = !collapsed;
-    setCollapsed(next);
-    localStorage.setItem(COLLAPSE_KEY, String(next));
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<(HTMLElement | null)[]>([]);
+  const [indicator, setIndicator] = useState({ top: 0, height: 0, ready: false });
+
+  useLayoutEffect(() => {
+    const activeIndex = LINKS.findIndex((l) => l.href === pathname);
+    const targetIndex = hoveredIndex ?? (activeIndex >= 0 ? activeIndex : null);
+    const el = targetIndex !== null ? itemRefs.current[targetIndex] : null;
+    if (el) {
+      setIndicator({ top: el.offsetTop, height: el.offsetHeight, ready: true });
+    } else {
+      setIndicator((s) => ({ ...s, ready: false }));
+    }
+  }, [hoveredIndex, pathname, expanded]);
+
+  function handleMouseEnter() {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+    setHovering(true);
+  }
+
+  function handleMouseLeave() {
+    setHoveredIndex(null);
+    hideTimer.current = setTimeout(() => setHovering(false), HOVER_COLLAPSE_DELAY_MS);
   }
 
   function handleSignOut() {
@@ -66,14 +97,20 @@ export function Nav({ session }: { session: Session }) {
     window.location.href = "/";
   }
 
+  const activeIndex = LINKS.findIndex((l) => l.href === pathname);
+  const indicatorIsActive = (hoveredIndex ?? activeIndex) === activeIndex && activeIndex >= 0;
+  const indicatorAccent = colorForIndex(hoveredIndex ?? (activeIndex >= 0 ? activeIndex : 0));
+
   return (
     <nav
-      className={`no-print flex h-full flex-col border-r border-slate-200 bg-white transition-[width] dark:border-slate-800 dark:bg-slate-900 ${
-        collapsed ? "w-16" : "w-60"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className={`no-print flex h-full flex-col border-r border-slate-200 bg-white transition-[width] duration-300 ease-out dark:border-slate-800 dark:bg-slate-900 ${
+        expanded ? "w-60" : "w-16"
       }`}
     >
       <div className="flex-1 overflow-y-auto p-4">
-        {collapsed ? (
+        {!expanded ? (
           <p className="mb-4 px-2 text-sm font-bold text-brand">V</p>
         ) : (
           <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5" style={{ background: HEADER_GRADIENT }}>
@@ -89,18 +126,43 @@ export function Nav({ session }: { session: Session }) {
             <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">(360° AR management)</p>
           </div>
         )}
-        <div className="flex flex-col gap-1">
+
+        <div ref={listRef} className="relative flex flex-col gap-1">
+          {/* Sliding highlight — glides to whichever row is hovered, or the
+              active page when nothing's hovered. transform (not top) keeps
+              the glide on the GPU-accelerated path. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 rounded-lg transition-all duration-300 ease-out"
+            style={{
+              transform: `translateY(${indicator.top}px)`,
+              height: indicator.height,
+              opacity: indicator.ready ? 1 : 0,
+              backgroundColor: indicatorIsActive ? undefined : hexToRgba(indicatorAccent, 0.08),
+            }}
+          >
+            {indicatorIsActive && <div className="h-full w-full rounded-lg bg-brand" />}
+            <div
+              className="absolute inset-y-0 left-0 w-[3px] rounded-l-lg transition-colors duration-300 ease-out"
+              style={{ backgroundColor: indicatorAccent }}
+            />
+          </div>
+
           {LINKS.map((l, i) => {
             const active = pathname === l.href;
             if (!l.built) {
               return (
                 <span
                   key={l.href}
+                  ref={(el) => {
+                    itemRefs.current[i] = el;
+                  }}
                   title={l.label}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 text-base text-slate-400 dark:text-slate-600"
+                  onMouseEnter={() => setHoveredIndex(i)}
+                  className="relative z-10 flex items-center justify-between rounded-lg px-3 py-2 text-base text-slate-400 dark:text-slate-600"
                 >
-                  {collapsed ? initials(l.label) : l.label}
-                  {!collapsed && (
+                  {!expanded ? initials(l.label) : l.label}
+                  {expanded && (
                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400 dark:bg-slate-800 dark:text-slate-500">
                       build me
                     </span>
@@ -108,57 +170,45 @@ export function Nav({ session }: { session: Session }) {
                 </span>
               );
             }
-            const accent = colorForIndex(i);
             return (
               <Link
                 key={l.href}
                 href={l.href}
                 title={l.label}
-                style={
-                  active || collapsed
-                    ? undefined
-                    : { borderLeft: `3px solid ${accent}`, backgroundColor: hexToRgba(accent, 0.05) }
-                }
-                className={`rounded-lg px-3 py-2 text-base font-medium transition-colors ${
-                  active
-                    ? "bg-brand text-white"
-                    : "text-slate-900 hover:brightness-95 dark:text-slate-100 dark:hover:brightness-125"
+                ref={(el) => {
+                  itemRefs.current[i] = el;
+                }}
+                onMouseEnter={() => setHoveredIndex(i)}
+                className={`relative z-10 rounded-lg px-3 py-2 text-base font-medium transition-colors duration-300 ${
+                  active ? "text-white" : "text-slate-900 dark:text-slate-100"
                 }`}
               >
-                {collapsed ? initials(l.label) : l.label}
+                {!expanded ? initials(l.label) : l.label}
               </Link>
             );
           })}
         </div>
       </div>
       <div className="flex flex-none flex-col gap-2 border-t border-slate-200 p-4 dark:border-slate-800">
-        {!collapsed && (
-          <div className="px-1 pb-1">
-            <p className="truncate text-base font-medium text-slate-700 dark:text-slate-200">
-              {session.name}
-            </p>
-            <p className="truncate text-sm text-slate-400 dark:text-slate-500">{session.email}</p>
-          </div>
-        )}
-        <ThemeToggle collapsed={collapsed} />
+        <ThemeToggle collapsed={!expanded} />
         <button
-          onClick={toggleCollapsed}
-          title={collapsed ? "Expand" : "Collapse"}
-          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${
-            collapsed ? "justify-center" : "gap-2"
-          }`}
+          onClick={() => setPinned((p) => !p)}
+          title={pinned ? "Unpin (auto-hide on mouse leave)" : "Pin sidebar open"}
+          className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 ${
+            pinned ? "text-brand" : "text-slate-500 dark:text-slate-400"
+          } ${!expanded ? "justify-center" : "gap-2"}`}
         >
-          <span aria-hidden>{collapsed ? "›" : "‹"}</span>
-          {!collapsed && "Collapse"}
+          <span aria-hidden>📌</span>
+          {expanded && (pinned ? "Pinned open" : "Pin open")}
         </button>
         <button
           onClick={handleSignOut}
           title="Sign out"
           className={`flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 ${
-            collapsed ? "justify-center" : "gap-2"
+            !expanded ? "justify-center" : "gap-2"
           }`}
         >
-          {collapsed ? "S" : "Sign out"}
+          {!expanded ? "S" : "Sign out"}
         </button>
       </div>
     </nav>
