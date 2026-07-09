@@ -5,7 +5,6 @@ import Link from "next/link";
 import { clearSession, type Session } from "@/lib/auth";
 import { AR360Logo } from "@/components/AR360Logo";
 import { FinanceIcon, ledgerGridPath, calculatorPath, invoicePath } from "@/components/decor/financeIcons";
-import { SignOutIcon } from "@/components/icons";
 
 /*
   Left sidebar. Only "Home" exists to start with — everything else is the roadmap
@@ -92,18 +91,18 @@ export function Nav({ session }: { session: Session }) {
               </Link>
             );
           })}
+          <button
+            onClick={handleSignOut}
+            title="Sign out"
+            className="rounded-lg px-3 py-2 text-left text-base font-medium text-white/85 transition-colors hover:bg-white/10"
+          >
+            Sign out
+          </button>
         </div>
       </div>
       <div className="relative z-10 flex-none border-t border-white/15 p-4">
         <p className="truncate text-base font-medium text-white">{session.name}</p>
         <p className="truncate text-sm text-white/60">{session.email}</p>
-        <button
-          onClick={handleSignOut}
-          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-dark"
-        >
-          <SignOutIcon />
-          Sign out
-        </button>
       </div>
     </nav>
   );
