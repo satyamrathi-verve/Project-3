@@ -11,20 +11,15 @@ export function KpiCard({
   value,
   hint,
   tone = "default",
-  icon,
 }: {
   label: string;
   value: ReactNode;
   hint?: string;
   tone?: keyof typeof TONE_CLASSES;
-  icon?: ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-        {icon && <span className="text-slate-300">{icon}</span>}
-      </div>
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
       <p className={`mt-1 text-[22px] font-semibold leading-tight tabular-nums ${TONE_CLASSES[tone]}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </div>

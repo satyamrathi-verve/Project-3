@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+/*
+  This screen is intentionally self-contained: it doesn't modify any shared
+  component (DataTable, KpiCard, globals.css) so it can never affect how other
+  screens in this shared repo look or behave. Formatting helpers, the stat
+  tile, and the tables below are local copies/variants, not edits to the
+  shared building blocks.
+*/
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,9 +24,6 @@ import {
 } from "lucide-react";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
-import { KpiCard } from "@/components/KpiCard";
-import { DataTable, type Column } from "@/components/DataTable";
-import { formatCurrency, formatDate } from "@/lib/format";
 import type { Customer, Invoice, ReceiptAllocation, Receipt, ReminderLog, ReminderTemplate } from "@/lib/types";
 
 type EffectiveStatus = "open" | "partial" | "overdue" | "paid";
@@ -63,6 +68,18 @@ const DEFAULT_TEMPLATE = {
   body: "Dear {customer},\n\nOur records show invoice {invoice_no} for {amount} is now {days_overdue} day(s) past its due date. Please arrange payment at your earliest convenience.\n\nThank you,\nVerve Advisory Pvt Ltd",
 };
 
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function todayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -83,6 +100,29 @@ function RiskBadge() {
     <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
       <ShieldAlert className="h-3 w-3" /> Over limit
     </span>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  tone = "default",
+  icon,
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "danger" | "success";
+  icon: ReactNode;
+}) {
+  const toneClass = tone === "danger" ? "text-red-700" : tone === "success" ? "text-emerald-700" : "text-slate-900";
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <span className="text-slate-300">{icon}</span>
+      </div>
+      <p className={`mt-1 text-[22px] font-semibold leading-tight tabular-nums ${toneClass}`}>{value}</p>
+    </div>
   );
 }
 
@@ -132,6 +172,115 @@ function SkeletonPanel() {
   );
 }
 
+function InvoiceTable({
+  rows,
+  overLimitCustomerIds,
+  onRowClick,
+}: {
+  rows: InvoiceRow[];
+  overLimitCustomerIds: Set<string>;
+  onRowClick: (row: InvoiceRow) => void;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50 text-left">
+            <th className="px-4 py-3 font-semibold text-slate-600">Invoice #</th>
+            <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
+            <th className="px-4 py-3 font-semibold text-slate-600">Due Date</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Amount</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Days Late</th>
+            <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                No invoices match your search/filter.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => {
+              const clickable = row.effectiveStatus === "overdue";
+              return (
+                <tr
+                  key={row.id}
+                  onClick={clickable ? () => onRowClick(row) : undefined}
+                  className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${clickable ? "cursor-pointer" : ""}`}
+                >
+                  <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <span className="inline-flex items-center">
+                      {row.customerName}
+                      {overLimitCustomerIds.has(row.customer_id) && <RiskBadge />}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">{formatDate(row.due_date)}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.total)}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.outstanding)}</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[row.effectiveStatus]}`}
+                    >
+                      {row.effectiveStatus}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CustomerSummaryTable({ rows }: { rows: CustomerSummaryRow[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50 text-left">
+            <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Credit Limit</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Invoices</th>
+            <th className="px-4 py-3 text-right font-semibold text-slate-600">Worst Days Late</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
+                No customers match your search.
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                <td className="px-4 py-3 text-slate-700">
+                  <span className="inline-flex items-center">
+                    {row.name}
+                    {row.overLimit && <RiskBadge />}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.creditLimit)}</td>
+                <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.outstanding)}</td>
+                <td className="px-4 py-3 text-right text-slate-700">{row.invoiceCount}</td>
+                <td className="px-4 py-3 text-right text-slate-700">{row.worstDaysLate > 0 ? row.worstDaysLate : "—"}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -147,6 +296,7 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const [sendState, setSendState] = useState<Record<string, SendState>>({});
 
   const fetchAll = useCallback(async () => {
@@ -192,6 +342,16 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // Slide the drawer in on the frame after it mounts (Tailwind-only, no
+  // shared global keyframe needed) and back out before it unmounts.
+  useEffect(() => {
+    if (selectedInvoiceId) {
+      const raf = requestAnimationFrame(() => setDrawerVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setDrawerVisible(false);
+  }, [selectedInvoiceId]);
 
   const customerById = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
@@ -321,6 +481,11 @@ export default function DashboardPage() {
     return logs[0] ?? null;
   }, [reminderLogs, selectedInvoice]);
 
+  function closeDrawer() {
+    setDrawerVisible(false);
+    window.setTimeout(() => setSelectedInvoiceId(null), 200);
+  }
+
   async function handleSend() {
     if (!supabase || !selectedInvoice) return;
     if (!selectedInvoice.customerEmail) return;
@@ -358,72 +523,11 @@ export default function DashboardPage() {
     setSendState((s) => ({ ...s, [selectedInvoice.id]: "sent" }));
   }
 
-  const invoiceColumns: Column<InvoiceRow>[] = [
-    { key: "invoice_no", header: "Invoice #" },
-    {
-      key: "customerName",
-      header: "Customer",
-      render: (row) => (
-        <span className="inline-flex items-center">
-          {row.customerName}
-          {overLimitCustomerIds.has(row.customer_id) && <RiskBadge />}
-        </span>
-      ),
-    },
-    { key: "due_date", header: "Due Date", render: (row) => formatDate(row.due_date) },
-    { key: "total", header: "Amount", className: "text-right", render: (row) => formatCurrency(row.total) },
-    {
-      key: "outstanding",
-      header: "Outstanding",
-      className: "text-right",
-      render: (row) => formatCurrency(row.outstanding),
-    },
-    {
-      key: "daysLate",
-      header: "Days Late",
-      className: "text-right",
-      render: (row) => (row.daysLate > 0 ? row.daysLate : "—"),
-    },
-    {
-      key: "status",
-      header: "Status",
-      render: (row) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[row.effectiveStatus]}`}>
-          {row.effectiveStatus}
-        </span>
-      ),
-    },
-  ];
-
-  const customerColumns: Column<CustomerSummaryRow>[] = [
-    {
-      key: "name",
-      header: "Customer",
-      render: (row) => (
-        <span className="inline-flex items-center">
-          {row.name}
-          {row.overLimit && <RiskBadge />}
-        </span>
-      ),
-    },
-    { key: "creditLimit", header: "Credit Limit", className: "text-right", render: (row) => formatCurrency(row.creditLimit) },
-    { key: "outstanding", header: "Outstanding", className: "text-right", render: (row) => formatCurrency(row.outstanding) },
-    { key: "invoiceCount", header: "Invoices", className: "text-right" },
-    {
-      key: "worstDaysLate",
-      header: "Worst Days Late",
-      className: "text-right",
-      render: (row) => (row.worstDaysLate > 0 ? row.worstDaysLate : "—"),
-    },
-  ];
-
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">AR Analyst Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Who owes us money, how late it is, and one click to chase it.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Who owes us money, how late it is, and one click to chase it.</p>
       </div>
 
       {!isConfigured && <NotConfigured />}
@@ -440,24 +544,20 @@ export default function DashboardPage() {
       {isConfigured && !loading && !error && (
         <>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-              label="Total AR"
-              value={formatCurrency(stats.totalAR)}
-              icon={<IndianRupee className="h-4 w-4" />}
-            />
-            <KpiCard
+            <StatCard label="Total AR" value={formatCurrency(stats.totalAR)} icon={<IndianRupee className="h-4 w-4" />} />
+            <StatCard
               label="Total Overdue"
               value={formatCurrency(stats.totalOverdue)}
               tone={stats.totalOverdue > 0 ? "danger" : "default"}
               icon={<AlertTriangle className="h-4 w-4" />}
             />
-            <KpiCard
+            <StatCard
               label="Collection Efficiency (CEI)"
               value={`${stats.cei.toFixed(1)}%`}
               tone="success"
               icon={<Percent className="h-4 w-4" />}
             />
-            <KpiCard
+            <StatCard
               label="Average Days Late"
               value={stats.avgDaysLate > 0 ? `${Math.round(stats.avgDaysLate)} days` : "—"}
               icon={<Clock className="h-4 w-4" />}
@@ -510,15 +610,13 @@ export default function DashboardPage() {
           </div>
 
           {tab === "invoices" ? (
-            <DataTable
-              columns={invoiceColumns}
+            <InvoiceTable
               rows={filteredInvoiceRows}
-              empty="No invoices match your search/filter."
-              onRowClick={(row) => (row.effectiveStatus === "overdue" ? setSelectedInvoiceId(row.id) : undefined)}
-              rowClassName={(row) => (row.effectiveStatus === "overdue" ? "" : "cursor-default")}
+              overLimitCustomerIds={overLimitCustomerIds}
+              onRowClick={(row) => setSelectedInvoiceId(row.id)}
             />
           ) : (
-            <DataTable columns={customerColumns} rows={filteredCustomerRows} empty="No customers match your search." />
+            <CustomerSummaryTable rows={filteredCustomerRows} />
           )}
           {tab === "invoices" && (
             <p className="mt-2 text-xs text-slate-400">Click an overdue row to draft a collection reminder.</p>
@@ -528,8 +626,16 @@ export default function DashboardPage() {
 
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/40" onClick={() => setSelectedInvoiceId(null)} aria-hidden="true" />
-          <div className="animate-slide-in-right relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+          <div
+            className={`absolute inset-0 bg-slate-900/40 transition-opacity duration-200 ${drawerVisible ? "opacity-100" : "opacity-0"}`}
+            onClick={closeDrawer}
+            aria-hidden="true"
+          />
+          <div
+            className={`relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl transition-transform duration-300 ease-out ${
+              drawerVisible ? "translate-x-0" : "translate-x-full"
+            }`}
+          >
             <div className="flex items-center justify-between border-b border-slate-200 p-5">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-brand">Collection Reminder</p>
@@ -537,7 +643,7 @@ export default function DashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedInvoiceId(null)}
+                onClick={closeDrawer}
                 className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                 aria-label="Close"
               >
