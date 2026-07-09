@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
 import { FormField, inputClass } from "@/components/FormField";
 import { TableSkeleton } from "@/components/Skeleton";
+import { Avatar } from "@/components/Avatar";
 import { ExportCsvButton, type CsvColumn } from "@/components/ExportCsvButton";
 import { CustomerSelector } from "@/components/receipts/CustomerSelector";
 import { StatementDocument, type LedgerRow, type Statement } from "@/components/reports/StatementDocument";
@@ -241,22 +242,13 @@ export default function CustomerStatementPage() {
     { header: "Balance", value: (r) => r.balance.toFixed(2) },
   ];
 
-  const allCsvRows = useMemo(
-    () =>
-      allStatements.flatMap(({ customer, statement }) =>
-        statement.ledger.map((row) => ({ customer, row }))
-      ),
-    [allStatements]
-  );
-  const allCsvColumns: CsvColumn<{ customer: Customer; row: LedgerRow }>[] = [
+  const allCsvColumns: CsvColumn<{ customer: Customer; statement: Statement }>[] = [
     { header: "Customer Code", value: (x) => x.customer.code },
     { header: "Customer Name", value: (x) => x.customer.name },
-    { header: "Date", value: (x) => x.row.date },
-    { header: "Transaction", value: (x) => x.row.label },
-    { header: "Details", value: (x) => x.row.detailLines.join(" | ") },
-    { header: "Amount", value: (x) => (x.row.debit ? x.row.debit.toFixed(2) : "") },
-    { header: "Payments", value: (x) => (x.row.credit ? x.row.credit.toFixed(2) : "") },
-    { header: "Balance", value: (x) => x.row.balance.toFixed(2) },
+    { header: "Opening Balance", value: (x) => x.statement.openingBalance.toFixed(2) },
+    { header: "Invoiced Amount", value: (x) => x.statement.invoicedAmount.toFixed(2) },
+    { header: "Amount Received", value: (x) => x.statement.amountReceived.toFixed(2) },
+    { header: "Balance Due", value: (x) => x.statement.balanceDue.toFixed(2) },
   ];
 
   return (
@@ -345,7 +337,7 @@ export default function CustomerStatementPage() {
                 >
                   Print All / Save as PDF
                 </button>
-                <ExportCsvButton rows={allCsvRows} columns={allCsvColumns} filename={`statements-all-customers-${from}-to-${to}.csv`} />
+                <ExportCsvButton rows={allStatements} columns={allCsvColumns} filename={`statements-all-customers-${from}-to-${to}.csv`} />
               </>
             )}
           </div>
@@ -378,18 +370,68 @@ export default function CustomerStatementPage() {
                   No customers with activity in this period.
                 </p>
               ) : (
-                <div className="flex flex-col gap-8">
-                  {allStatements.map(({ customer, statement }, i) => (
-                    <StatementDocument
-                      key={customer.id}
-                      company={company}
-                      customer={customer}
-                      statement={statement}
-                      from={from}
-                      to={to}
-                      breakAfter={i < allStatements.length - 1}
-                    />
-                  ))}
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white print:border-0">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                        <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Opening Balance</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Invoiced</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Received</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-600">Balance Due</th>
+                        <th className="px-4 py-3 text-right font-semibold text-slate-600 print:hidden" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allStatements.map(({ customer, statement }) => (
+                        <tr key={customer.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <Avatar name={customer.name} className="h-8 w-8 text-xs" />
+                              <div>
+                                <p className="font-medium text-slate-800">{customer.name}</p>
+                                <p className="text-xs text-slate-400">{customer.code}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-700">{money(statement.openingBalance)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{money(statement.invoicedAmount)}</td>
+                          <td className="px-4 py-3 text-right text-slate-700">{money(statement.amountReceived)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-900">{money(statement.balanceDue)}</td>
+                          <td className="px-4 py-3 text-right print:hidden">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setViewMode("single");
+                              }}
+                              className="text-sm font-medium text-brand hover:underline"
+                            >
+                              View Statement
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-slate-200 bg-slate-50">
+                        <td className="px-4 py-3 font-semibold text-slate-700">Total</td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {money(allStatements.reduce((s, x) => s + x.statement.openingBalance, 0))}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {money(allStatements.reduce((s, x) => s + x.statement.invoicedAmount, 0))}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-slate-800">
+                          {money(allStatements.reduce((s, x) => s + x.statement.amountReceived, 0))}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-slate-900">
+                          {money(allStatements.reduce((s, x) => s + x.statement.balanceDue, 0))}
+                        </td>
+                        <td className="print:hidden" />
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               )}
             </>
