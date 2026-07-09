@@ -70,3 +70,98 @@ export function parseCsv(text: string): { headers: string[]; rows: Record<string
 
   return { headers, rows };
 }
+
+/*
+  GL Master's import/export needs a couple of things parseCsv() above doesn't
+  provide: quoted fields that span multiple lines, header casing preserved
+  as-is (not lowercased), CSV *generation*, and a browser download helper.
+  Added here rather than a separate file so there's one CSV module, not two.
+*/
+
+/** Parses CSV text into rows of string cells, quote-aware across line breaks. */
+export function parseCSV(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  const src = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+
+    if (inQuotes) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows.filter((r) => !(r.length === 1 && r[0] === ""));
+}
+
+/** Parses CSV text into an array of objects keyed by the header row (headers kept as-is). */
+export function parseCSVToObjects(text: string): Record<string, string>[] {
+  const [header, ...rows] = parseCSV(text);
+  if (!header) return [];
+  return rows.map((r) => Object.fromEntries(header.map((h, i) => [h.trim(), (r[i] ?? "").trim()])));
+}
+
+function csvEscape(value: string): string {
+  if (/[",\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+/** Builds CSV text from a header row and rows of plain values. */
+export function toCSV(header: string[], rows: (string | number | null | undefined)[][]): string {
+  const lines = [header.map((h) => csvEscape(h)).join(",")];
+  for (const row of rows) {
+    lines.push(row.map((v) => csvEscape(v === null || v === undefined ? "" : String(v))).join(","));
+  }
+  return lines.join("\n");
+}
+
+/** Triggers a browser download of `content` as a file named `filename`. */
+export function downloadTextFile(filename: string, content: string, mimeType = "text/csv;charset=utf-8;") {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/** YYYYMMDD_HHMM timestamp for export/template file names. */
+export function exportTimestamp(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}`;
+}

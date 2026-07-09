@@ -35,12 +35,22 @@ export interface Customer {
   created_at: string;
 }
 
+export type GLAccountStatus = "active" | "inactive";
+
 export interface GLAccount {
   id: string;
   code: string;
   name: string;
   type: "asset" | "liability" | "income" | "expense";
   parent_group: string | null;
+  /* Added by supabase/migrations/002_gl_v_series.sql — optional so this type
+     still matches gl_accounts before that migration has been run. */
+  parent_account_id?: string | null;
+  opening_balance?: number;
+  current_balance?: number;
+  status?: GLAccountStatus;
+  description?: string | null;
+  created_at?: string;
 }
 
 export type InvoiceStatus = "open" | "partial" | "paid" | "overdue";
