@@ -1,0 +1,5 @@
+invoice_no,invoice_date,customer_code,due_date,description,qty,rate,tax_amount,notes
+INV-9001,2026-06-01,CUST001,,Cotton yarn - bulk order,100,450,4500,Bulk CSV import test
+INV-9002,2026-06-05,CUST002,2026-06-20,Organic packaging supplies,50,220,1100,
+INV-9003,2026-06-10,CUST999,,Custom order,20,300,600,Unknown customer code on purpose
+INV-9004,2026-06-12,CUST003,,Software support retainer,,5000,900,Missing qty on purpose

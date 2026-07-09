@@ -1,0 +1,4 @@
+code,name,contact_person,email,phone,address,gstin,pan,credit_limit,credit_days,opening_balance
+CUST101,Bluewave Logistics Pvt Ltd,Sanjay Kulkarni,sanjay@bluewave.in,+91 98220 44444,Pune,27AABCB4444D1Z4,AABCB4444D,400000,30,0
+CUST102,Harborline Foods LLP,Meera Iyer,meera@harborline.in,+91 98450 55555,Chennai,33AABCH5555E1Z5,AABCH5555E,250000,15,5000
+CUST103,,Devika Nair,devika@orbitpack.in,+91 98770 66666,Kochi,32AABCO6666F1Z6,AABCO6666F,600000,45,0
