@@ -30,6 +30,7 @@ export function DataTable<T extends { id: string }>({
   bare = false,
   rowClassName,
   footer,
+  onRowClick,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -39,6 +40,8 @@ export function DataTable<T extends { id: string }>({
   rowClassName?: (row: T) => string;
   /** Optional <tr> rendered in a <tfoot>, e.g. a totals row. */
   footer?: ReactNode;
+  /** Optional: makes rows clickable (e.g. open a detail drawer). */
+  onRowClick?: (row: T) => void;
 }) {
   const table = (
     <table className="w-full text-sm">
@@ -70,9 +73,10 @@ export function DataTable<T extends { id: string }>({
           rows.map((row, i) => (
             <tr
               key={row.id}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={`border-b border-slate-100 last:border-0 transition-colors hover:bg-blue-50/50 ${
                 i % 2 === 1 ? "bg-slate-50/60" : "bg-white"
-              } ${rowClassName?.(row) ?? ""}`}
+              } ${onRowClick ? "cursor-pointer" : ""} ${rowClassName?.(row) ?? ""}`}
             >
               {columns.map((c) => (
                 <td
