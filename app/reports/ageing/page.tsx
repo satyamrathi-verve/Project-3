@@ -66,13 +66,23 @@ function computeAgeing(
     if (!prev || r.receipt_date > prev) lastPaymentByCustomer.set(r.customer_id, r.receipt_date);
   }
 
+  // Seed each customer's row with their opening balance, folded into the
+  // "not yet due" / 0-30 bucket since we have no per-invoice aging for it.
+  // Without this, this report's total permanently understates real AR by
+  // the sum of every customer's opening_balance — GL's Accounts Receivable
+  // (which posts opening balances via lib/glPosting.ts) includes them, so
+  // omitting them here made this report and GL Master disagree.
   const byCustomer = new Map<string, Omit<CustomerAgeing, "status">>();
   for (const c of customers) {
+    const opening = Number(c.opening_balance) || 0;
     byCustomer.set(c.id, {
       id: c.id,
       code: c.code,
       name: c.name,
       ...EMPTY_BUCKETS,
+      d0_30: opening,
+      total: opening,
+      notDue: opening,
       lastPayment: lastPaymentByCustomer.get(c.id) ?? null,
       overdueAmount: 0,
       weightedDaysSum: 0,

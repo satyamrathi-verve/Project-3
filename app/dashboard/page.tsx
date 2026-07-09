@@ -96,12 +96,6 @@ interface AgeingBucket {
   color: string;
 }
 
-interface WeekPoint {
-  label: string;
-  actual?: number;
-  predicted?: number;
-}
-
 interface DonutSegment {
   label: string;
   value: number;
@@ -159,21 +153,10 @@ function daysLateFor(dueDateISO: string, asOnISO: string): number {
   return Math.floor((asOn.getTime() - due.getTime()) / 86400000);
 }
 
-function startOfWeek(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  const diffToMonday = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - diffToMonday);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function shortLabel(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 }
 
 // Last calendar day of a "YYYY-MM" month key, as an ISO date string.
@@ -287,72 +270,6 @@ function AgeingBarChart({ buckets, animate }: { buckets: AgeingBucket[]; animate
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function CashForecastChart({ points, animate }: { points: WeekPoint[]; animate: boolean }) {
-  const width = 600;
-  const height = 200;
-  const padTop = 16;
-  const padBottom = 28;
-  const max = Math.max(1, ...points.map((p) => Math.max(p.actual ?? 0, p.predicted ?? 0)));
-  const stepX = width / (points.length - 1);
-  const y = (v: number) => padTop + (1 - v / max) * (height - padTop - padBottom);
-
-  const actualPts = points.map((p, i) => (p.actual !== undefined ? `${i * stepX},${y(p.actual)}` : null)).filter(Boolean);
-  const predictedPts = points
-    .map((p, i) => (p.predicted !== undefined ? `${i * stepX},${y(p.predicted)}` : null))
-    .filter(Boolean);
-  // Draw the lines by animating stroke-dashoffset from fully-hidden to 0 —
-  // a classic SVG "line drawing itself" reveal, no extra libraries needed.
-  const pathLength = width * 1.3;
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-cream p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-900">Cash Forecast — Predicted vs Actual</p>
-        <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-4 rounded" style={{ backgroundColor: PRIMARY }} /> Actual
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-4 rounded border-2 border-dashed border-slate-400" /> Predicted
-          </span>
-        </div>
-      </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="Weekly cash forecast">
-        {actualPts.length > 1 && (
-          <polyline
-            points={actualPts.join(" ")}
-            fill="none"
-            stroke={PRIMARY}
-            strokeWidth={2.5}
-            strokeDasharray={pathLength}
-            strokeDashoffset={animate ? 0 : pathLength}
-            style={{ transition: "stroke-dashoffset 900ms ease-out" }}
-          />
-        )}
-        {predictedPts.length > 1 && (
-          <polyline
-            points={predictedPts.join(" ")}
-            fill="none"
-            stroke="#94a3b8"
-            strokeWidth={2.5}
-            strokeDasharray="6 4"
-            style={{ opacity: animate ? 1 : 0, transition: "opacity 600ms ease-out 700ms" }}
-          />
-        )}
-        {points.map((p, i) => (
-          <g key={p.label} style={{ opacity: animate ? 1 : 0, transition: `opacity 400ms ease-out ${500 + i * 60}ms` }}>
-            {p.actual !== undefined && <circle cx={i * stepX} cy={y(p.actual)} r={3} fill={PRIMARY} />}
-            {p.predicted !== undefined && <circle cx={i * stepX} cy={y(p.predicted)} r={3} fill="#94a3b8" />}
-            <text x={i * stepX} y={height - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
-              {p.label}
-            </text>
-          </g>
-        ))}
-      </svg>
     </div>
   );
 }
@@ -602,6 +519,7 @@ export default function DashboardPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [sendState, setSendState] = useState<Record<string, SendState>>({});
+  const [glBalances, setGlBalances] = useState<RankedItem[]>([]);
 
   // Flips true one frame after data finishes loading, so charts/KPIs animate
   // in from their zero state instead of appearing already-filled.
@@ -622,6 +540,7 @@ export default function DashboardPage() {
       { data: receiptData, error: e4 },
       { data: templateData, error: e5 },
       { data: logData, error: e6 },
+      { data: glData, error: e7 },
     ] = await Promise.all([
       supabase.from("customers").select("*").order("name"),
       supabase.from("invoices").select("*"),
@@ -629,6 +548,10 @@ export default function DashboardPage() {
       supabase.from("receipts").select("*"),
       supabase.from("reminder_templates").select("*"),
       supabase.from("reminder_log").select("*"),
+      supabase
+        .from("gl_accounts")
+        .select("name, current_balance")
+        .in("name", ["Accounts Receivable", "GST/VAT Payable", "Cash on Hand", "Main Bank Account", "Service Revenue"]),
     ]);
 
     const err = e1 ?? e2 ?? e3 ?? e4 ?? e5 ?? e6;
@@ -644,6 +567,17 @@ export default function DashboardPage() {
     setReceipts((receiptData ?? []) as Receipt[]);
     setTemplates((templateData ?? []) as ReminderTemplate[]);
     setReminderLogs((logData ?? []) as ReminderLog[]);
+    // Not fatal if this one query fails (e.g. migration_gl_journal.sql not
+    // run yet) — the rest of the dashboard still works, this card just
+    // shows "no data" via RankedBarList's own empty state.
+    if (!e7) {
+      setGlBalances(
+        ((glData ?? []) as { name: string; current_balance: number }[]).map((a) => ({
+          label: a.name,
+          value: Math.round(Number(a.current_balance ?? 0)),
+        }))
+      );
+    }
     setLoading(false);
     setLastUpdated(new Date());
   }, []);
@@ -744,29 +678,23 @@ export default function DashboardPage() {
     ];
   }, [openRows]);
 
-  const cashForecast: WeekPoint[] = useMemo(() => {
-    const today = todayISO();
-    const currentWeekStart = startOfWeek(today);
-    const points: WeekPoint[] = [];
-
-    for (let i = 3; i >= 0; i--) {
-      const weekStart = addDays(currentWeekStart, -7 * i);
-      const weekEnd = addDays(weekStart, 6);
-      const actual = receipts
-        .filter((r) => r.receipt_date >= weekStart && r.receipt_date <= weekEnd)
-        .reduce((s, r) => s + r.amount, 0);
-      points.push({ label: shortLabel(weekStart), actual });
+  // Same shape/grouping as monthlyTrend below, but for money actually
+  // collected (receipts) instead of money invoiced — the two side by side
+  // answer "are we billing more than we're collecting."
+  const monthlyCollectionTrend: MonthPoint[] = useMemo(() => {
+    const byMonth = new Map<string, number>();
+    for (const r of receipts) {
+      const key = r.receipt_date.slice(0, 7);
+      byMonth.set(key, (byMonth.get(key) ?? 0) + r.amount);
     }
-    for (let i = 1; i <= 4; i++) {
-      const weekStart = addDays(currentWeekStart, 7 * i);
-      const weekEnd = addDays(weekStart, 6);
-      const predicted = openRows
-        .filter((r) => r.due_date >= weekStart && r.due_date <= weekEnd)
-        .reduce((s, r) => s + r.outstanding, 0);
-      points.push({ label: shortLabel(weekStart), predicted });
-    }
-    return points;
-  }, [receipts, openRows]);
+    return Array.from(byMonth.keys())
+      .sort()
+      .slice(-6)
+      .map((key) => ({
+        label: new Date(`${key}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short" }),
+        amount: byMonth.get(key) ?? 0,
+      }));
+  }, [receipts]);
 
   const statusDonut: DonutSegment[] = useMemo(() => {
     let open = 0,
@@ -786,21 +714,6 @@ export default function DashboardPage() {
       { label: "Paid", value: paid, color: "#10b981" },
     ];
   }, [invoiceRows]);
-
-  // Amount-based (not headcount) — a handful of large Enterprise accounts can
-  // dominate exposure far more than their share of the customer count.
-  const segmentDonut: DonutSegment[] = useMemo(() => {
-    let enterprise = 0;
-    let smb = 0;
-    for (const r of openRows) {
-      if (r.segment === "Enterprise") enterprise += r.outstanding;
-      else smb += r.outstanding;
-    }
-    return [
-      { label: "Enterprise", value: Math.round(enterprise), color: "#64748b" },
-      { label: "SMB", value: Math.round(smb), color: PRIMARY },
-    ];
-  }, [openRows]);
 
   const paymentModeDonut: DonutSegment[] = useMemo(() => {
     const MODE_LABELS: Record<string, string> = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
@@ -1204,7 +1117,9 @@ export default function DashboardPage() {
           {dashTab === "insights" && (
             <>
               <div className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}>
-                <CashForecastChart points={cashForecast} animate={mounted} />
+                <ChartCard title="Monthly Collection Trend">
+                  <MonthlyTrendChart points={monthlyCollectionTrend} animate={mounted} />
+                </ChartCard>
                 <ChartCard title="Monthly Invoiced Trend">
                   <MonthlyTrendChart points={monthlyTrend} animate={mounted} />
                 </ChartCard>
@@ -1215,7 +1130,9 @@ export default function DashboardPage() {
                 style={{ transitionDelay: "80ms" }}
               >
                 <DonutChart title="Invoices by Status" segments={statusDonut} animate={mounted} />
-                <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} animate={mounted} />
+                <ChartCard title="Live GL Balances (AR-related)">
+                  <RankedBarList items={glBalances} formatValue={formatCurrency} color={PRIMARY} animate={mounted} />
+                </ChartCard>
                 <DonutChart
                   title="Collections by Payment Mode"
                   segments={paymentModeDonut}

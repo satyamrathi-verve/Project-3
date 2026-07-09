@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { supabase, isConfigured } from "@/lib/supabase";
-import type { GLAccount, GLAccountStatus } from "@/lib/types";
+import type { GLAccount, GLAccountStatus, GLJournalEntry } from "@/lib/types";
 import { ACCOUNT_DESCRIPTIONS, GL_GROUPS, glGroupForAccount } from "@/lib/chartOfAccounts";
 import { parseCSVToObjects, downloadTextFile, exportTimestamp } from "@/lib/csv";
 import {
@@ -55,6 +55,7 @@ function GLMasterScreen() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<GLAccount | null>(null);
+  const [reportAccount, setReportAccount] = useState<GLAccount | null>(null);
 
   useEffect(() => {
     if (!isConfigured || !supabase) {
@@ -200,11 +201,20 @@ function GLMasterScreen() {
     {
       key: "actions",
       header: "",
-      className: "w-16 text-right",
+      className: "w-32 text-right",
       render: (row) => (
-        <button type="button" onClick={() => setEditingAccount(row)} className="text-xs font-medium text-brand underline">
-          Edit
-        </button>
+        <span className="inline-flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setReportAccount(row)}
+            className="text-xs font-medium text-brand underline"
+          >
+            Report
+          </button>
+          <button type="button" onClick={() => setEditingAccount(row)} className="text-xs font-medium text-brand underline">
+            Edit
+          </button>
+        </span>
       ),
     },
   ];
@@ -296,6 +306,8 @@ function GLMasterScreen() {
           }}
         />
       )}
+
+      {reportAccount && <GLReportModal account={reportAccount} onClose={() => setReportAccount(null)} />}
     </>
   );
 }
@@ -322,6 +334,135 @@ function SummaryStrip({
           </p>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Every debit/credit line posted to this account (see lib/glPosting.ts),
+// oldest first, with a running balance — so "why is the balance what it is"
+// is always one click away instead of having to trust the number blindly.
+function GLReportModal({ account, onClose }: { account: GLAccount; onClose: () => void }) {
+  const [entries, setEntries] = useState<GLJournalEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase!
+        .from("gl_journal_entries")
+        .select("*")
+        .eq("gl_account_id", account.id)
+        .order("entry_date", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      if (error) setError(error.message);
+      else setEntries((data ?? []) as GLJournalEntry[]);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [account.id]);
+
+  const debitNormal = account.type === "asset" || account.type === "expense";
+  const opening = Number(account.opening_balance ?? 0);
+
+  let running = opening;
+  const rows = entries.map((e) => {
+    const delta = debitNormal ? Number(e.debit) - Number(e.credit) : Number(e.credit) - Number(e.debit);
+    running += delta;
+    return { ...e, running };
+  });
+
+  const totalDebit = entries.reduce((s, e) => s + Number(e.debit), 0);
+  const totalCredit = entries.reduce((s, e) => s + Number(e.credit), 0);
+  const money = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+  return (
+    <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-cream p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">
+              GL Report — {account.code} {account.name}
+            </h3>
+            <p className="text-xs text-slate-500">Every posted journal line for this account, oldest first.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-700">
+            ✕
+          </button>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg border border-slate-200 bg-cream-dim p-3">
+            <p className="text-[10px] font-medium uppercase text-slate-500">Opening Balance</p>
+            <p className="text-sm font-semibold text-slate-900">{money(opening)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-cream-dim p-3">
+            <p className="text-[10px] font-medium uppercase text-slate-500">Total Debit</p>
+            <p className="text-sm font-semibold text-slate-900">{money(totalDebit)}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-cream-dim p-3">
+            <p className="text-[10px] font-medium uppercase text-slate-500">Total Credit</p>
+            <p className="text-sm font-semibold text-slate-900">{money(totalCredit)}</p>
+          </div>
+          <div className="rounded-lg border border-brand/30 bg-brand/5 p-3">
+            <p className="text-[10px] font-medium uppercase text-slate-500">Current Balance</p>
+            <p className="text-sm font-bold text-brand">{money(Number(account.current_balance ?? 0))}</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-slate-500">Loading entries…</p>
+        ) : error ? (
+          <p className="text-sm text-rose-600">{error}</p>
+        ) : rows.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-slate-300 p-6 text-center text-sm text-slate-400">
+            No journal entries posted to this account yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-cream-dim text-left">
+                  <th className="px-3 py-2 font-semibold text-slate-600">Date</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Description</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Source</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-600">Debit</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-600">Credit</th>
+                  <th className="px-3 py-2 text-right font-semibold text-slate-600">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-slate-100 last:border-0">
+                    <td className="px-3 py-2 text-slate-600">
+                      {new Date(r.entry_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                    </td>
+                    <td className="px-3 py-2 text-slate-700">{r.description ?? "—"}</td>
+                    <td className="px-3 py-2 capitalize text-slate-500">{r.reference_type.replace("_", " ")}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{r.debit > 0 ? money(Number(r.debit)) : "—"}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">{r.credit > 0 ? money(Number(r.credit)) : "—"}</td>
+                    <td className="px-3 py-2 text-right font-medium text-slate-900">{money(r.running)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-cream-dim"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

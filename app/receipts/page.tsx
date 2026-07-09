@@ -16,6 +16,7 @@ import { StatTile } from "@/components/StatTile";
 import { Avatar } from "@/components/Avatar";
 import { ExportCsvButton, type CsvColumn } from "@/components/ExportCsvButton";
 import { DocumentIcon, BanknoteIcon, CalendarIcon, CardIcon, SearchIcon, PlusIcon } from "@/components/icons";
+import { Printer } from "lucide-react";
 import { CustomerSelector } from "@/components/receipts/CustomerSelector";
 import { InvoiceAllocationGrid, type InvoiceRow } from "@/components/receipts/InvoiceAllocationGrid";
 import { AccountingPreview } from "@/components/receipts/AccountingPreview";
@@ -628,6 +629,15 @@ export default function ReceiptEntryPage() {
       className: "text-right",
       render: (r) => (
         <div className="flex justify-end gap-3">
+          <Link
+            href={`/receipts/${r.id}/print`}
+            target="_blank"
+            title={`Print ${r.receipt_no}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-slate-400 hover:text-brand"
+          >
+            <Printer className="h-4 w-4" />
+          </Link>
           <button type="button" onClick={() => openEditForm(r)} className="text-sm font-medium text-brand hover:underline">
             Edit
           </button>
