@@ -200,6 +200,7 @@ export default function CustomerMasterPage() {
     {
       key: "name",
       header: "Customer Name",
+      filter: { type: "text" },
       render: (c) => (
         <div className="flex items-center gap-2.5">
           <span
@@ -211,16 +212,29 @@ export default function CustomerMasterPage() {
         </div>
       ),
     },
-    { key: "city", header: "Location", render: (c) => c.address ?? "—" },
-    { key: "contact_person", header: "Contact Person", render: (c) => c.contact_person ?? "—" },
+    {
+      key: "city",
+      header: "Location",
+      filter: { type: "select" },
+      filterValue: (c) => c.address ?? "",
+      render: (c) => c.address ?? "—",
+    },
+    {
+      key: "contact_person",
+      header: "Contact Person",
+      filter: { type: "text" },
+      render: (c) => c.contact_person ?? "—",
+    },
     { key: "email", header: "Email ID", render: (c) => c.email ?? "—" },
     { key: "phone", header: "Contact Number", render: (c) => c.phone ?? "—" },
     {
       key: "gst_treatment",
       header: "GST Treatment",
+      filter: { type: "select" },
       /* Derived, not stored: this schema only has a raw gstin, no real treatment
          field (Regular / Composition / SEZ / Consumer, etc). "Registered" here just
          means a GSTIN is on file. */
+      filterValue: (c) => (c.gstin && c.gstin.trim() ? "Registered" : "Unregistered"),
       render: (c) => {
         const registered = Boolean(c.gstin && c.gstin.trim());
         return (
@@ -244,6 +258,7 @@ export default function CustomerMasterPage() {
       header: "PAN",
       render: (c) => <span className="font-mono text-sm font-bold text-slate-700">{c.pan ?? "—"}</span>,
     },
+    { key: "credit_limit", header: "Credit Limit", render: (c) => money(c.credit_limit) },
     {
       key: "net_receivable",
       header: "Net Receivable",
