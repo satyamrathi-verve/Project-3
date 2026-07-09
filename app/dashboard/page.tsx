@@ -645,7 +645,13 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     const today = todayISO();
-    const totalAR = openRows.reduce((s, r) => s + r.outstanding, 0);
+    // GL's Accounts Receivable posts every customer's opening_balance (see
+    // lib/glPosting.ts / scripts/backfill-gl-journal.mjs), so Total AR here
+    // has to include it too — otherwise this tile and the GL Master balance
+    // (and AR Ageing, which has the same fix) permanently disagree by
+    // exactly the sum of opening balances.
+    const openingBalanceTotal = customers.reduce((s, c) => s + (Number(c.opening_balance) || 0), 0);
+    const totalAR = openRows.reduce((s, r) => s + r.outstanding, 0) + openingBalanceTotal;
     const totalPastDue = openRows.reduce((s, r) => (r.daysLate > 0 ? s + r.outstanding : s), 0);
     const totalCollected = receipts.reduce((s, r) => s + r.amount, 0);
     const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
@@ -658,7 +664,7 @@ export default function DashboardPage() {
     const dso = salesInWindow > 0 ? (totalAR / salesInWindow) * DSO_WINDOW_DAYS : 0;
 
     return { totalAR, totalPastDue, cei, dso, openCount: openRows.length };
-  }, [openRows, receipts, invoices]);
+  }, [openRows, receipts, invoices, customers]);
 
   const ageingBuckets: AgeingBucket[] = useMemo(() => {
     const b = { current: 0, b1_30: 0, b31_60: 0, b61_90: 0, b91: 0 };

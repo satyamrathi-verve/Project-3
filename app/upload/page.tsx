@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { parseCsv } from "@/lib/csv";
-import { colorForIndex } from "@/lib/colors";
 import type { InvoiceStatus } from "@/lib/types";
 
 type UploadType = "customers" | "invoices";
@@ -488,12 +487,11 @@ export default function UploadPage() {
     setInserting(false);
   }
 
-  function editableColumn(f: FieldDef, colorIndex: number): Column<Row> {
+  function editableColumn(f: FieldDef): Column<Row> {
     return {
       key: f.key,
       header: f.label,
       className: f.numeric ? "text-right" : undefined,
-      accentColor: colorForIndex(colorIndex),
       render: (row: Row) => {
         const errors = rowErrors(type, row.values, customersByCode);
         const hasError = Boolean(errors[f.key]);
@@ -531,16 +529,15 @@ export default function UploadPage() {
 
   const columns: Column<Row>[] =
     type === "customers"
-      ? [...CUSTOMER_FIELDS.map((f, i) => editableColumn(f, i)), statusColumn]
+      ? [...CUSTOMER_FIELDS.map((f) => editableColumn(f)), statusColumn]
       : [
-          editableColumn(invoiceField("invoice_no"), 0),
-          editableColumn(invoiceField("ref_no"), 1),
-          editableColumn(invoiceField("invoice_date"), 2),
-          editableColumn(invoiceField("customer_code"), 3),
+          editableColumn(invoiceField("invoice_no")),
+          editableColumn(invoiceField("ref_no")),
+          editableColumn(invoiceField("invoice_date")),
+          editableColumn(invoiceField("customer_code")),
           {
             key: "__customer_name",
             header: "Customer Name",
-            accentColor: colorForIndex(4),
             render: (row: Row) => {
               const customer = customersByCode.get(row.values.customer_code.trim());
               return customer ? (
@@ -550,11 +547,10 @@ export default function UploadPage() {
               );
             },
           },
-          editableColumn(invoiceField("credit_period"), 5),
+          editableColumn(invoiceField("credit_period")),
           {
             key: "__due_date",
             header: "Due Date",
-            accentColor: colorForIndex(6),
             render: (row: Row) => {
               const customer = customersByCode.get(row.values.customer_code.trim());
               const due = resolvedDueDate(row.values, customer);
@@ -565,25 +561,24 @@ export default function UploadPage() {
               );
             },
           },
-          editableColumn(invoiceField("description"), 7),
-          editableColumn(invoiceField("qty"), 0),
-          editableColumn(invoiceField("rate"), 1),
+          editableColumn(invoiceField("description")),
+          editableColumn(invoiceField("qty")),
+          editableColumn(invoiceField("rate")),
           {
             key: "__taxable_value",
             header: "Taxable Value-Qty*Rate",
             className: "text-right",
-            accentColor: colorForIndex(2),
             render: (row: Row) => (
               <span className="whitespace-nowrap text-xs font-medium tabular-nums text-slate-700">
                 {money(taxableValue(row.values))}
               </span>
             ),
           },
-          editableColumn(invoiceField("igst"), 3),
-          editableColumn(invoiceField("cgst"), 4),
-          editableColumn(invoiceField("sgst"), 5),
-          editableColumn(invoiceField("tds"), 6),
-          editableColumn(invoiceField("narration"), 7),
+          editableColumn(invoiceField("igst")),
+          editableColumn(invoiceField("cgst")),
+          editableColumn(invoiceField("sgst")),
+          editableColumn(invoiceField("tds")),
+          editableColumn(invoiceField("narration")),
           statusColumn,
         ];
 

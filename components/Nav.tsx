@@ -13,7 +13,6 @@ import { FinanceIcon, ledgerGridPath, calculatorPath, invoicePath } from "@/comp
   turns into a real link.
 */
 const LINKS: { href: string; label: string; built: boolean }[] = [
-  { href: "/", label: "Home", built: true },
   { href: "/signin", label: "Sign In", built: true },
   { href: "/dashboard", label: "Dashboard", built: true },
   { href: "/masters/customers", label: "Customer Master", built: true },
