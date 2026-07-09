@@ -51,6 +51,7 @@ body {
     height: auto !important;
   }
   .print-scroll {
+    min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
   }

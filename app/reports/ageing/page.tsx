@@ -6,50 +6,44 @@ import { NotConfigured } from "@/components/NotConfigured";
 import { KpiCard } from "@/components/KpiCard";
 import type { Customer, Invoice, Receipt, ReceiptAllocation } from "@/lib/types";
 
-type FollowUp = "urgent" | "watch" | "ok";
+type BucketKey = "d0_30" | "d30_60" | "d60_90" | "d90plus";
 
 interface CustomerAgeing {
   id: string;
   code: string;
   name: string;
-  notDue: number;
-  d0_15: number;
-  d15_30: number;
-  d30_45: number;
-  d45plus: number;
+  d0_30: number;
+  d30_60: number;
+  d60_90: number;
+  d90plus: number;
   total: number;
+  notDue: number;
+  over45: number;
   lastPayment: string | null;
   overdueAmount: number;
   weightedDaysSum: number;
-  followUp: FollowUp;
+  status: BucketKey;
 }
 
-type SortKey =
-  | "customer"
-  | "total"
-  | "notDue"
-  | "d0_15"
-  | "d15_30"
-  | "d30_45"
-  | "d45plus"
-  | "lastPayment"
-  | "followUp";
+type SortKey = "customer" | "total" | "d0_30" | "d30_60" | "d60_90" | "d90plus" | "lastPayment" | "status";
 
-type StatusFilter = "all" | FollowUp;
+type StatusFilter = "all" | BucketKey;
 
-const EMPTY_BUCKETS = { notDue: 0, d0_15: 0, d15_30: 0, d30_45: 0, d45plus: 0, total: 0 };
-const FOLLOWUP_RANK: Record<FollowUp, number> = { ok: 0, watch: 1, urgent: 2 };
-const FOLLOWUP_LABEL: Record<FollowUp, string> = { urgent: "Urgent", watch: "Watch", ok: "OK" };
-const FOLLOWUP_BADGE: Record<FollowUp, string> = {
-  urgent: "bg-red-100 text-red-700",
-  watch: "bg-amber-100 text-amber-700",
-  ok: "bg-gray-100 text-gray-600",
+const EMPTY_BUCKETS = { d0_30: 0, d30_60: 0, d60_90: 0, d90plus: 0, total: 0, notDue: 0, over45: 0 };
+const STATUS_RANK: Record<BucketKey, number> = { d0_30: 0, d30_60: 1, d60_90: 2, d90plus: 3 };
+const STATUS_LABEL: Record<BucketKey, string> = { d0_30: "0–30", d30_60: "30–60", d60_90: "60–90", d90plus: "90+" };
+const STATUS_BADGE: Record<BucketKey, string> = {
+  d0_30: "bg-blue-50 text-blue-700",
+  d30_60: "bg-yellow-100 text-yellow-800",
+  d60_90: "bg-orange-100 text-orange-800",
+  d90plus: "bg-red-100 text-red-700",
 };
 
-function deriveFollowUp(r: Omit<CustomerAgeing, "followUp">): FollowUp {
-  if (r.d45plus > 0) return "urgent";
-  if (r.d30_45 > 0 || r.d15_30 > 0) return "watch";
-  return "ok";
+function deriveStatus(r: Omit<CustomerAgeing, "status">): BucketKey {
+  if (r.d90plus > 0) return "d90plus";
+  if (r.d60_90 > 0) return "d60_90";
+  if (r.d30_60 > 0) return "d30_60";
+  return "d0_30";
 }
 
 function computeAgeing(
@@ -72,7 +66,7 @@ function computeAgeing(
     if (!prev || r.receipt_date > prev) lastPaymentByCustomer.set(r.customer_id, r.receipt_date);
   }
 
-  const byCustomer = new Map<string, Omit<CustomerAgeing, "followUp">>();
+  const byCustomer = new Map<string, Omit<CustomerAgeing, "status">>();
   for (const c of customers) {
     byCustomer.set(c.id, {
       id: c.id,
@@ -94,29 +88,32 @@ function computeAgeing(
 
     const due = new Date(`${inv.due_date}T00:00:00`);
     const daysOverdue = Math.floor((asOn.getTime() - due.getTime()) / 86400000);
-    const bucket =
-      daysOverdue <= 0 ? "notDue" : daysOverdue <= 15 ? "d0_15" : daysOverdue <= 30 ? "d15_30" : daysOverdue <= 45 ? "d30_45" : "d45plus";
+    // Invoices not yet due (daysOverdue <= 0) are folded into the "0-30" / current bucket.
+    const bucket: BucketKey = daysOverdue <= 30 ? "d0_30" : daysOverdue <= 60 ? "d30_60" : daysOverdue <= 90 ? "d60_90" : "d90plus";
 
     row[bucket] += outstanding;
     row.total += outstanding;
+    if (daysOverdue <= 0) row.notDue += outstanding;
+    if (daysOverdue > 45) row.over45 += outstanding;
     if (daysOverdue > 0) {
       row.overdueAmount += outstanding;
       row.weightedDaysSum += outstanding * daysOverdue;
     }
   }
 
-  return Array.from(byCustomer.values()).map((r) => ({ ...r, followUp: deriveFollowUp(r) }));
+  return Array.from(byCustomer.values()).map((r) => ({ ...r, status: deriveStatus(r) }));
 }
 
 function reduceTotals(rows: CustomerAgeing[]) {
   return rows.reduce(
     (acc, r) => ({
-      notDue: acc.notDue + r.notDue,
-      d0_15: acc.d0_15 + r.d0_15,
-      d15_30: acc.d15_30 + r.d15_30,
-      d30_45: acc.d30_45 + r.d30_45,
-      d45plus: acc.d45plus + r.d45plus,
+      d0_30: acc.d0_30 + r.d0_30,
+      d30_60: acc.d30_60 + r.d30_60,
+      d60_90: acc.d60_90 + r.d60_90,
+      d90plus: acc.d90plus + r.d90plus,
       total: acc.total + r.total,
+      notDue: acc.notDue + r.notDue,
+      over45: acc.over45 + r.over45,
     }),
     { ...EMPTY_BUCKETS }
   );
@@ -126,7 +123,7 @@ function compareRows(a: CustomerAgeing, b: CustomerAgeing, key: SortKey, dir: "a
   let cmp = 0;
   if (key === "customer") cmp = a.name.localeCompare(b.name);
   else if (key === "lastPayment") cmp = (a.lastPayment ?? "").localeCompare(b.lastPayment ?? "");
-  else if (key === "followUp") cmp = FOLLOWUP_RANK[a.followUp] - FOLLOWUP_RANK[b.followUp];
+  else if (key === "status") cmp = STATUS_RANK[a.status] - STATUS_RANK[b.status];
   else cmp = (a[key] as number) - (b[key] as number);
   return dir === "asc" ? cmp : -cmp;
 }
@@ -149,31 +146,14 @@ function exportCsv(rows: CustomerAgeing[], totals: ReturnType<typeof reduceTotal
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const headers = [
-    "Customer",
-    "Code",
-    "Total Outstanding",
-    "Not Due",
-    "0-15 Days",
-    "15-30 Days",
-    "30-45 Days",
-    "45+ Days",
-    "Last Payment",
-    "Follow-up",
-  ];
+  const headers = ["Customer", "Code", "Total Outstanding", "0-30 Days", "30-60 Days", "60-90 Days", "90+ Days", "Last Payment", "Status"];
   const lines = [headers.join(",")];
   for (const r of rows) {
     lines.push(
-      [r.name, r.code, r.total, r.notDue, r.d0_15, r.d15_30, r.d30_45, r.d45plus, r.lastPayment ?? "", FOLLOWUP_LABEL[r.followUp]]
-        .map(escape)
-        .join(",")
+      [r.name, r.code, r.total, r.d0_30, r.d30_60, r.d60_90, r.d90plus, r.lastPayment ?? "", STATUS_LABEL[r.status]].map(escape).join(",")
     );
   }
-  lines.push(
-    ["Totals", "", totals.total, totals.notDue, totals.d0_15, totals.d15_30, totals.d30_45, totals.d45plus, "", ""]
-      .map(escape)
-      .join(",")
-  );
+  lines.push(["Totals", "", totals.total, totals.d0_30, totals.d30_60, totals.d60_90, totals.d90plus, "", ""].map(escape).join(","));
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -183,16 +163,14 @@ function exportCsv(rows: CustomerAgeing[], totals: ReturnType<typeof reduceTotal
   URL.revokeObjectURL(url);
 }
 
-function FollowUpBadge({ status }: { status: FollowUp }) {
+function StatusBadge({ status }: { status: BucketKey }) {
   return (
-    <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${FOLLOWUP_BADGE[status]}`}>
-      {FOLLOWUP_LABEL[status]}
-    </span>
+    <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[status]}`}>{STATUS_LABEL[status]}</span>
   );
 }
 
-function BucketCell({ value, tone }: { value: number; tone: "notDue" | "d0_15" | "d15_30" | "d30_45" | "d45plus" }) {
-  if (tone === "d45plus") {
+function BucketCell({ value, tone }: { value: number; tone: BucketKey }) {
+  if (tone === "d90plus") {
     return (
       <td className={`px-4 py-3 text-right tabular-nums ${value > 0 ? "bg-red-100 font-bold text-red-700" : "bg-red-50 text-red-300"}`}>
         <span className="inline-flex items-center justify-end gap-1">
@@ -206,7 +184,7 @@ function BucketCell({ value, tone }: { value: number; tone: "notDue" | "d0_15" |
       </td>
     );
   }
-  const bg = { notDue: "bg-blue-50/60", d0_15: "bg-green-50", d15_30: "bg-yellow-50", d30_45: "bg-orange-50" }[tone];
+  const bg = { d0_30: "bg-blue-50/60", d30_60: "bg-yellow-50", d60_90: "bg-orange-50" }[tone];
   return <td className={`px-4 py-3 text-right tabular-nums ${bg}`}>{money(value)}</td>;
 }
 
@@ -319,8 +297,8 @@ export default function AgeingReportPage() {
 
   const worstOffenderIds = useMemo(() => {
     const worst = ageingRows
-      .filter((r) => r.d45plus > 0)
-      .sort((a, b) => b.d45plus - a.d45plus)
+      .filter((r) => r.d90plus > 0)
+      .sort((a, b) => b.d90plus - a.d90plus)
       .slice(0, 10);
     return new Set(worst.map((r) => r.id));
   }, [ageingRows]);
@@ -329,26 +307,30 @@ export default function AgeingReportPage() {
     const q = search.trim().toLowerCase();
     const filtered = ageingRows.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q) && !r.code.toLowerCase().includes(q)) return false;
-      if (statusFilter !== "all" && r.followUp !== statusFilter) return false;
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
       return true;
     });
     return [...filtered].sort((a, b) => compareRows(a, b, sortKey, sortDir));
   }, [ageingRows, search, statusFilter, sortKey, sortDir]);
 
-  const globalTotals = useMemo(() => reduceTotals(ageingRows), [ageingRows]);
+  // All totals below derive from displayRows (the filtered set), so choosing a status
+  // filter moves every total on the page — header cards, summary panel, and table footer.
   const tableTotals = useMemo(() => reduceTotals(displayRows), [displayRows]);
 
   const collectionPct = useMemo(() => {
-    const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
-    const totalCollected = receipts.reduce((s, r) => s + r.amount, 0);
+    const ids = new Set(displayRows.map((r) => r.id));
+    const filteredInvoices = invoices.filter((i) => ids.has(i.customer_id));
+    const filteredReceipts = receipts.filter((r) => ids.has(r.customer_id));
+    const totalInvoiced = filteredInvoices.reduce((s, i) => s + i.total, 0);
+    const totalCollected = filteredReceipts.reduce((s, r) => s + r.amount, 0);
     return totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : 0;
-  }, [invoices, receipts]);
+  }, [displayRows, invoices, receipts]);
 
   const avgAge = useMemo(() => {
-    const totalOverdue = ageingRows.reduce((s, r) => s + r.overdueAmount, 0);
-    const weighted = ageingRows.reduce((s, r) => s + r.weightedDaysSum, 0);
+    const totalOverdue = displayRows.reduce((s, r) => s + r.overdueAmount, 0);
+    const weighted = displayRows.reduce((s, r) => s + r.weightedDaysSum, 0);
     return totalOverdue > 0 ? weighted / totalOverdue : 0;
-  }, [ageingRows]);
+  }, [displayRows]);
 
   function toggleSort(key: SortKey) {
     if (key === sortKey) {
@@ -424,8 +406,8 @@ export default function AgeingReportPage() {
       {isConfigured && (
         <>
           <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <KpiCard label="Outstanding" value={money(globalTotals.total)} />
-            <KpiCard label="Customers" value={String(ageingRows.length)} />
+            <KpiCard label="Outstanding" value={money(tableTotals.total)} />
+            <KpiCard label="Customers" value={String(displayRows.length)} />
             <KpiCard label="Report Date" value={formatDate(asOnDate)} />
           </div>
 
@@ -454,9 +436,10 @@ export default function AgeingReportPage() {
                 className="mt-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               >
                 <option value="all">All</option>
-                <option value="urgent">Urgent (45+)</option>
-                <option value="watch">Watch (15–45)</option>
-                <option value="ok">OK</option>
+                <option value="d0_30">0–30 days</option>
+                <option value="d30_60">30–60 days</option>
+                <option value="d60_90">60–90 days</option>
+                <option value="d90plus">90+ days</option>
               </select>
             </div>
             <div>
@@ -506,11 +489,11 @@ export default function AgeingReportPage() {
 
           {!error && (
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-              <KpiCard label="Outstanding" value={money(globalTotals.total)} />
-              <KpiCard label="Not Due" value={money(globalTotals.notDue)} />
-              <KpiCard label="Current" value={money(globalTotals.notDue + globalTotals.d0_15)} />
-              <KpiCard label="Over 30 Days" value={money(globalTotals.d30_45 + globalTotals.d45plus)} tone="danger" />
-              <KpiCard label="Over 45 Days" value={money(globalTotals.d45plus)} tone="danger" />
+              <KpiCard label="Outstanding" value={money(tableTotals.total)} />
+              <KpiCard label="Not Due" value={money(tableTotals.notDue)} hint="Due date not yet reached" />
+              <KpiCard label="Current" value={money(tableTotals.d0_30)} hint="Within 30 days" />
+              <KpiCard label="Over 30 Days" value={money(tableTotals.total - tableTotals.d0_30)} tone="danger" hint="30+ days overdue" />
+              <KpiCard label="Over 45 Days" value={money(tableTotals.over45)} tone="danger" hint="45+ days overdue" />
               <KpiCard label="Collection %" value={`${collectionPct.toFixed(1)}%`} tone="success" />
               <KpiCard label="Average Age" value={avgAge > 0 ? `${Math.round(avgAge)} days` : "—"} />
             </div>
@@ -523,25 +506,24 @@ export default function AgeingReportPage() {
               {/* Desktop / tablet table */}
               <div className="hidden md:block">
                 <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-                  <div className="print-scroll max-h-[65vh] overflow-y-auto">
+                  <div className="print-scroll min-h-[460px] max-h-[70vh] overflow-y-auto">
                     <table className="w-full border-collapse text-sm">
                       <thead className="sticky top-0 z-20">
                         <tr>
                           <SortableTh label="Customer" sortKeyName="customer" tooltip="Click to sort by name" align="left" stickyLeft />
                           <SortableTh label="Total Outstanding" sortKeyName="total" tooltip="Invoice total minus all receipts applied" />
-                          <SortableTh label="Not Due" sortKeyName="notDue" tooltip="Due date hasn't arrived yet" />
-                          <SortableTh label="0–15 Days" sortKeyName="d0_15" tooltip="1–15 days past the due date" />
-                          <SortableTh label="15–30 Days" sortKeyName="d15_30" tooltip="16–30 days past the due date" />
-                          <SortableTh label="30–45 Days" sortKeyName="d30_45" tooltip="31–45 days past the due date" />
-                          <SortableTh label="45+ Days" sortKeyName="d45plus" tooltip="Over 45 days late — needs urgent follow-up" />
+                          <SortableTh label="0–30 Days" sortKeyName="d0_30" tooltip="Not yet due, or up to 30 days past the due date" />
+                          <SortableTh label="30–60 Days" sortKeyName="d30_60" tooltip="31–60 days past the due date" />
+                          <SortableTh label="60–90 Days" sortKeyName="d60_90" tooltip="61–90 days past the due date" />
+                          <SortableTh label="90+ Days" sortKeyName="d90plus" tooltip="Over 90 days late — needs urgent follow-up" />
                           <SortableTh label="Last Payment" sortKeyName="lastPayment" tooltip="Date of this customer's most recent receipt" />
-                          <SortableTh label="Follow-up" sortKeyName="followUp" tooltip="Derived from how overdue the balance is" align="left" />
+                          <SortableTh label="Status" sortKeyName="status" tooltip="Customer's oldest overdue bucket" align="left" />
                         </tr>
                       </thead>
                       <tbody>
                         {displayRows.length === 0 ? (
                           <tr>
-                            <td colSpan={9}>
+                            <td colSpan={8}>
                               <EmptyState message={emptyMessage} />
                             </td>
                           </tr>
@@ -569,16 +551,15 @@ export default function AgeingReportPage() {
                                   {copiedId === r.id && <span className="ml-2 text-xs text-emerald-600">Copied</span>}
                                 </td>
                                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-900">{money(r.total)}</td>
-                                <BucketCell value={r.notDue} tone="notDue" />
-                                <BucketCell value={r.d0_15} tone="d0_15" />
-                                <BucketCell value={r.d15_30} tone="d15_30" />
-                                <BucketCell value={r.d30_45} tone="d30_45" />
-                                <BucketCell value={r.d45plus} tone="d45plus" />
+                                <BucketCell value={r.d0_30} tone="d0_30" />
+                                <BucketCell value={r.d30_60} tone="d30_60" />
+                                <BucketCell value={r.d60_90} tone="d60_90" />
+                                <BucketCell value={r.d90plus} tone="d90plus" />
                                 <td className="px-4 py-3 text-right text-slate-600">
                                   {r.lastPayment ? formatDate(r.lastPayment) : "—"}
                                 </td>
                                 <td className="px-4 py-3">
-                                  <FollowUpBadge status={r.followUp} />
+                                  <StatusBadge status={r.status} />
                                 </td>
                               </tr>
                             );
@@ -592,11 +573,10 @@ export default function AgeingReportPage() {
                               Totals ({displayRows.length})
                             </td>
                             <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.total)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.notDue)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d0_15)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d15_30)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d30_45)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-red-700">{money(tableTotals.d45plus)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d0_30)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d30_60)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">{money(tableTotals.d60_90)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-red-700">{money(tableTotals.d90plus)}</td>
                             <td colSpan={2} className="px-4 py-3" />
                           </tr>
                         </tfoot>
@@ -630,7 +610,7 @@ export default function AgeingReportPage() {
                               {isWorst && <span className="h-1.5 w-1.5 flex-none rounded-full bg-red-500" aria-hidden />}
                               {r.name}
                             </button>
-                            <FollowUpBadge status={r.followUp} />
+                            <StatusBadge status={r.status} />
                           </div>
                           <p className="mt-1 text-xs text-slate-400">
                             {r.code} · Last payment {r.lastPayment ? formatDate(r.lastPayment) : "—"}
@@ -642,28 +622,24 @@ export default function AgeingReportPage() {
                           </div>
                           <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                             <div className="rounded-lg bg-blue-50/60 px-2 py-1.5">
-                              <p className="text-slate-500">Not due</p>
-                              <p className="font-medium tabular-nums text-slate-800">{money(r.notDue)}</p>
-                            </div>
-                            <div className="rounded-lg bg-green-50 px-2 py-1.5">
-                              <p className="text-slate-500">0–15d</p>
-                              <p className="font-medium tabular-nums text-slate-800">{money(r.d0_15)}</p>
+                              <p className="text-slate-500">0–30d</p>
+                              <p className="font-medium tabular-nums text-slate-800">{money(r.d0_30)}</p>
                             </div>
                             <div className="rounded-lg bg-yellow-50 px-2 py-1.5">
-                              <p className="text-slate-500">15–30d</p>
-                              <p className="font-medium tabular-nums text-slate-800">{money(r.d15_30)}</p>
+                              <p className="text-slate-500">30–60d</p>
+                              <p className="font-medium tabular-nums text-slate-800">{money(r.d30_60)}</p>
                             </div>
                             <div className="rounded-lg bg-orange-50 px-2 py-1.5">
-                              <p className="text-slate-500">30–45d</p>
-                              <p className="font-medium tabular-nums text-slate-800">{money(r.d30_45)}</p>
+                              <p className="text-slate-500">60–90d</p>
+                              <p className="font-medium tabular-nums text-slate-800">{money(r.d60_90)}</p>
                             </div>
                             <div
-                              className={`col-span-2 rounded-lg px-2 py-1.5 ${
-                                r.d45plus > 0 ? "bg-red-100 font-bold text-red-700" : "bg-red-50 text-red-300"
+                              className={`rounded-lg px-2 py-1.5 ${
+                                r.d90plus > 0 ? "bg-red-100 font-bold text-red-700" : "bg-red-50 text-red-300"
                               }`}
                             >
-                              <p className="text-slate-500">45+ days</p>
-                              <p className="tabular-nums">{money(r.d45plus)}</p>
+                              <p className="text-slate-500">90+ days</p>
+                              <p className="tabular-nums">{money(r.d90plus)}</p>
                             </div>
                           </div>
                         </div>
