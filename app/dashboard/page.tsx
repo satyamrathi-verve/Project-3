@@ -52,9 +52,9 @@ type SendState = "idle" | "sending" | "sent" | "error";
 
 // Reference-image-inspired accent, scoped to this screen only (inline hex,
 // not a shared Tailwind token).
-const ACCENT = "#FF6A4D";
-const ACCENT_DARK = "#E5502F";
-const PAGE_BG = "#FBEDE6";
+const ACCENT = "#FF8B6E";
+const ACCENT_DARK = "#FF6A4D";
+const PAGE_BG = "#FDF6F2";
 
 // A customer with credit_limit at/above this is treated as "Enterprise" for
 // the segment filter — a derived heuristic, not a stored field.
@@ -166,6 +166,34 @@ function fillTemplate(text: string, vars: Record<string, string>): string {
   return text.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? `{${key}}`);
 }
 
+// Animates a number from 0 up to `target` once `active` flips true (used to
+// count the KPI tiles up on load instead of just popping in).
+function useCountUp(target: number, active: boolean, durationMs = 800): number {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const start = performance.now();
+    function tick(now: number) {
+      const t = Math.min(1, (now - start) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(target * eased);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, active, durationMs]);
+  return value;
+}
+
+// Shared "fade + rise into place" treatment for section entrances. Pass a
+// staggered `delayMs` via inline style (Tailwind's JIT can't pick up a
+// dynamic arbitrary-value class like `delay-[${n}ms]` from a template
+// string, so the delay has to be a real style prop, not a class).
+function revealClass(visible: boolean): string {
+  return `transition-all duration-500 ease-out ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`;
+}
+
 function AlertDot() {
   return (
     <span
@@ -179,42 +207,54 @@ function AlertDot() {
 function StatCard({
   label,
   value,
+  format,
   hint,
   tone = "default",
   icon,
+  active,
 }: {
   label: string;
-  value: string;
+  value: number;
+  format: (n: number) => string;
   hint?: string;
   tone?: "default" | "danger" | "success";
   icon: ReactNode;
+  active: boolean;
 }) {
+  const animated = useCountUp(value, active);
   const toneClass = tone === "danger" ? "text-red-600" : tone === "success" ? "text-emerald-600" : "text-slate-900";
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
         <span className="rounded-full p-1.5" style={{ backgroundColor: `${ACCENT}1A`, color: ACCENT }}>
           {icon}
         </span>
       </div>
-      <p className={`mt-2 text-[26px] font-extrabold leading-none tabular-nums ${toneClass}`}>{value}</p>
+      <p className={`mt-2 text-[26px] font-extrabold leading-none tabular-nums ${toneClass}`}>{format(animated)}</p>
       {hint && <p className="mt-1.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
 
-function AgeingBarChart({ buckets }: { buckets: AgeingBucket[] }) {
+function AgeingBarChart({ buckets, animate }: { buckets: AgeingBucket[]; animate: boolean }) {
   const max = Math.max(1, ...buckets.map((b) => b.amount));
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <p className="mb-4 text-sm font-bold text-slate-900">AR Aging</p>
       <div className="space-y-3">
-        {buckets.map((b) => (
+        {buckets.map((b, i) => (
           <div key={b.label} className="flex items-center gap-3">
             <span className="w-16 flex-none text-xs font-medium text-slate-500">{b.label}</span>
             <div className="h-5 flex-1 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full" style={{ width: `${(b.amount / max) * 100}%`, backgroundColor: b.color }} />
+              <div
+                className="h-full rounded-full transition-[width] duration-700 ease-out"
+                style={{
+                  width: `${animate ? (b.amount / max) * 100 : 0}%`,
+                  backgroundColor: b.color,
+                  transitionDelay: `${i * 80}ms`,
+                }}
+              />
             </div>
             <span className="w-16 flex-none text-right text-xs font-bold text-slate-800">{formatCurrency(b.amount)}</span>
           </div>
@@ -224,7 +264,7 @@ function AgeingBarChart({ buckets }: { buckets: AgeingBucket[] }) {
   );
 }
 
-function CashForecastChart({ points }: { points: WeekPoint[] }) {
+function CashForecastChart({ points, animate }: { points: WeekPoint[]; animate: boolean }) {
   const width = 600;
   const height = 200;
   const padTop = 16;
@@ -237,9 +277,12 @@ function CashForecastChart({ points }: { points: WeekPoint[] }) {
   const predictedPts = points
     .map((p, i) => (p.predicted !== undefined ? `${i * stepX},${y(p.predicted)}` : null))
     .filter(Boolean);
+  // Draw the lines by animating stroke-dashoffset from fully-hidden to 0 —
+  // a classic SVG "line drawing itself" reveal, no extra libraries needed.
+  const pathLength = width * 1.3;
 
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <div className="mb-3 flex items-center justify-between">
         <p className="text-sm font-bold text-slate-900">Cash Forecast — Predicted vs Actual</p>
         <div className="flex items-center gap-4 text-xs text-slate-500">
@@ -252,12 +295,29 @@ function CashForecastChart({ points }: { points: WeekPoint[] }) {
         </div>
       </div>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="Weekly cash forecast">
-        {actualPts.length > 1 && <polyline points={actualPts.join(" ")} fill="none" stroke={ACCENT} strokeWidth={2.5} />}
+        {actualPts.length > 1 && (
+          <polyline
+            points={actualPts.join(" ")}
+            fill="none"
+            stroke={ACCENT}
+            strokeWidth={2.5}
+            strokeDasharray={pathLength}
+            strokeDashoffset={animate ? 0 : pathLength}
+            style={{ transition: "stroke-dashoffset 900ms ease-out" }}
+          />
+        )}
         {predictedPts.length > 1 && (
-          <polyline points={predictedPts.join(" ")} fill="none" stroke="#94a3b8" strokeWidth={2.5} strokeDasharray="6 4" />
+          <polyline
+            points={predictedPts.join(" ")}
+            fill="none"
+            stroke="#94a3b8"
+            strokeWidth={2.5}
+            strokeDasharray="6 4"
+            style={{ opacity: animate ? 1 : 0, transition: "opacity 600ms ease-out 700ms" }}
+          />
         )}
         {points.map((p, i) => (
-          <g key={p.label}>
+          <g key={p.label} style={{ opacity: animate ? 1 : 0, transition: `opacity 400ms ease-out ${500 + i * 60}ms` }}>
             {p.actual !== undefined && <circle cx={i * stepX} cy={y(p.actual)} r={3} fill={ACCENT} />}
             {p.predicted !== undefined && <circle cx={i * stepX} cy={y(p.predicted)} r={3} fill="#94a3b8" />}
             <text x={i * stepX} y={height - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
@@ -274,10 +334,12 @@ function DonutChart({
   title,
   segments,
   formatValue = (v: number) => String(v),
+  animate,
 }: {
   title: string;
   segments: DonutSegment[];
   formatValue?: (v: number) => string;
+  animate: boolean;
 }) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   let cumulative = 0;
@@ -291,12 +353,16 @@ function DonutChart({
     .join(", ");
 
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <p className="mb-4 text-sm font-bold text-slate-900">{title}</p>
       <div className="flex items-center gap-5">
         <div
-          className="relative h-28 w-28 flex-none rounded-full"
-          style={{ background: total > 0 ? `conic-gradient(${stops})` : "#f1f5f9" }}
+          className="relative h-28 w-28 flex-none rounded-full transition-all duration-500 ease-out"
+          style={{
+            background: total > 0 ? `conic-gradient(${stops})` : "#f1f5f9",
+            transform: animate ? "scale(1)" : "scale(0.6)",
+            opacity: animate ? 1 : 0,
+          }}
         >
           <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-white text-center">
             <p className="text-sm font-extrabold leading-tight text-slate-900">{formatValue(total)}</p>
@@ -319,7 +385,7 @@ function DonutChart({
 
 function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm transition-shadow duration-200 hover:shadow-md">
       <p className="mb-4 text-sm font-bold text-slate-900">{title}</p>
       {children}
     </div>
@@ -330,22 +396,31 @@ function RankedBarList({
   items,
   formatValue,
   color,
+  animate,
 }: {
   items: RankedItem[];
   formatValue: (v: number) => string;
   color: string;
+  animate: boolean;
 }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   if (items.length === 0) return <p className="text-xs text-slate-400">No data yet.</p>;
   return (
     <div className="space-y-2.5">
-      {items.map((item) => (
+      {items.map((item, i) => (
         <div key={item.label} className="flex items-center gap-3">
           <span className="w-24 flex-none truncate text-xs text-slate-500" title={item.label}>
             {item.label}
           </span>
           <div className="h-4 flex-1 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full" style={{ width: `${(item.value / max) * 100}%`, backgroundColor: color }} />
+            <div
+              className="h-full rounded-full transition-[width] duration-700 ease-out"
+              style={{
+                width: `${animate ? (item.value / max) * 100 : 0}%`,
+                backgroundColor: color,
+                transitionDelay: `${i * 70}ms`,
+              }}
+            />
           </div>
           <span className="w-16 flex-none text-right text-xs font-bold text-slate-800">{formatValue(item.value)}</span>
         </div>
@@ -354,17 +429,21 @@ function RankedBarList({
   );
 }
 
-function MonthlyTrendChart({ points }: { points: MonthPoint[] }) {
+function MonthlyTrendChart({ points, animate }: { points: MonthPoint[]; animate: boolean }) {
   const max = Math.max(1, ...points.map((p) => p.amount));
   const barArea = 110;
   return (
     <div className="flex items-end gap-2" style={{ height: barArea + 44 }}>
-      {points.map((p) => (
+      {points.map((p, i) => (
         <div key={p.label} className="flex flex-1 flex-col items-center justify-end gap-1.5">
           <span className="text-[10px] font-bold text-slate-700">{formatCurrency(p.amount)}</span>
           <div
-            className="w-full rounded-t-lg"
-            style={{ height: `${Math.max(6, (p.amount / max) * barArea)}px`, backgroundColor: ACCENT }}
+            className="w-full rounded-t-lg transition-[height] duration-700 ease-out"
+            style={{
+              height: `${animate ? Math.max(6, (p.amount / max) * barArea) : 0}px`,
+              backgroundColor: ACCENT,
+              transitionDelay: `${i * 80}ms`,
+            }}
           />
           <span className="text-[10px] text-slate-400">{p.label}</span>
         </div>
@@ -378,14 +457,14 @@ function SkeletonPanel() {
     <div className="animate-pulse space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-2xl border border-black/5 bg-white" />
+          <div key={i} className="h-24 rounded-2xl border border-slate-100 bg-white" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="h-56 rounded-2xl border border-black/5 bg-white" />
-        <div className="h-56 rounded-2xl border border-black/5 bg-white" />
+        <div className="h-56 rounded-2xl border border-slate-100 bg-white" />
+        <div className="h-56 rounded-2xl border border-slate-100 bg-white" />
       </div>
-      <div className="h-64 rounded-2xl border border-black/5 bg-white" />
+      <div className="h-64 rounded-2xl border border-slate-100 bg-white" />
     </div>
   );
 }
@@ -409,6 +488,10 @@ export default function DashboardPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [sendState, setSendState] = useState<Record<string, SendState>>({});
+
+  // Flips true one frame after data finishes loading, so charts/KPIs animate
+  // in from their zero state instead of appearing already-filled.
+  const [mounted, setMounted] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!supabase) {
@@ -462,6 +545,15 @@ export default function DashboardPage() {
     }
     setDrawerVisible(false);
   }, [selectedInvoiceId]);
+
+  useEffect(() => {
+    if (loading || error) {
+      setMounted(false);
+      return;
+    }
+    const raf = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(raf);
+  }, [loading, error]);
 
   const customerById = useMemo(() => new Map(customers.map((c) => [c.id, c])), [customers]);
 
@@ -591,14 +683,14 @@ export default function DashboardPage() {
       else smb += r.outstanding;
     }
     return [
-      { label: "Enterprise", value: Math.round(enterprise), color: "#1f2937" },
+      { label: "Enterprise", value: Math.round(enterprise), color: "#64748b" },
       { label: "SMB", value: Math.round(smb), color: ACCENT },
     ];
   }, [openRows]);
 
   const paymentModeDonut: DonutSegment[] = useMemo(() => {
     const MODE_LABELS: Record<string, string> = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
-    const MODE_COLORS: Record<string, string> = { cash: "#f59e0b", cheque: "#1f2937", upi: ACCENT, neft: "#10b981" };
+    const MODE_COLORS: Record<string, string> = { cash: "#f59e0b", cheque: "#64748b", upi: ACCENT, neft: "#10b981" };
     const byMode = new Map<string, number>();
     for (const r of receipts) byMode.set(r.mode, (byMode.get(r.mode) ?? 0) + r.amount);
     return Array.from(byMode.entries()).map(([mode, amount]) => ({
@@ -726,7 +818,7 @@ export default function DashboardPage() {
         </div>
         {lastUpdated && (
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-black/5 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
+            <span className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm">
               Last updated: {lastUpdated.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
             </span>
             <button
@@ -756,63 +848,98 @@ export default function DashboardPage() {
 
       {isConfigured && !loading && !error && (
         <>
-          <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <StatCard label="Total AR Outstanding" value={formatFullCurrency(stats.totalAR)} icon={<IndianRupee className="h-4 w-4" />} />
+          <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 ${revealClass(mounted)}`}>
+            <StatCard
+              label="Total AR Outstanding"
+              value={stats.totalAR}
+              format={formatFullCurrency}
+              icon={<IndianRupee className="h-4 w-4" />}
+              active={mounted}
+            />
             <StatCard
               label="Days Sales Outstanding"
-              value={`${stats.dso.toFixed(0)} days`}
+              value={stats.dso}
+              format={(n) => `${n.toFixed(0)} days`}
               hint={stats.dso <= 45 ? "Within standard (≤45)" : "Above standard (45)"}
               tone={stats.dso > 45 ? "danger" : "success"}
               icon={<Clock className="h-4 w-4" />}
+              active={mounted}
             />
             <StatCard
               label="Total Past Due"
-              value={formatFullCurrency(stats.totalPastDue)}
+              value={stats.totalPastDue}
+              format={formatFullCurrency}
               tone={stats.totalPastDue > 0 ? "danger" : "default"}
               icon={<AlertTriangle className="h-4 w-4" />}
+              active={mounted}
             />
-            <StatCard label="Collection Effectiveness" value={`${stats.cei.toFixed(1)}%`} tone="success" icon={<Percent className="h-4 w-4" />} />
-            <StatCard label="Open Invoices" value={String(stats.openCount)} icon={<TrendingUp className="h-4 w-4" />} />
+            <StatCard
+              label="Collection Effectiveness"
+              value={stats.cei}
+              format={(n) => `${n.toFixed(1)}%`}
+              tone="success"
+              icon={<Percent className="h-4 w-4" />}
+              active={mounted}
+            />
+            <StatCard
+              label="Open Invoices"
+              value={stats.openCount}
+              format={(n) => String(Math.round(n))}
+              icon={<TrendingUp className="h-4 w-4" />}
+              active={mounted}
+            />
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <AgeingBarChart buckets={ageingBuckets} />
-            <CashForecastChart points={cashForecast} />
+          <div
+            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "80ms" }}
+          >
+            <AgeingBarChart buckets={ageingBuckets} animate={mounted} />
+            <CashForecastChart points={cashForecast} animate={mounted} />
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <DonutChart title="Invoices by Status" segments={statusDonut} />
-            <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} />
-            <DonutChart title="Collections by Payment Mode" segments={paymentModeDonut} formatValue={formatCurrency} />
+          <div
+            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "160ms" }}
+          >
+            <DonutChart title="Invoices by Status" segments={statusDonut} animate={mounted} />
+            <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} animate={mounted} />
+            <DonutChart title="Collections by Payment Mode" segments={paymentModeDonut} formatValue={formatCurrency} animate={mounted} />
           </div>
 
-          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div
+            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "240ms" }}
+          >
             <ChartCard title="Monthly Invoiced Trend">
-              <MonthlyTrendChart points={monthlyTrend} />
+              <MonthlyTrendChart points={monthlyTrend} animate={mounted} />
             </ChartCard>
             <ChartCard title="Top 5 Customers by Outstanding">
-              <RankedBarList items={topCustomersByOutstanding} formatValue={formatCurrency} color={ACCENT} />
+              <RankedBarList items={topCustomersByOutstanding} formatValue={formatCurrency} color={ACCENT} animate={mounted} />
             </ChartCard>
             <ChartCard title="Customers by City">
-              <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#1f2937" />
+              <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#64748b" animate={mounted} />
             </ChartCard>
           </div>
 
-          <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div
+            className={`mb-4 flex flex-wrap items-center gap-3 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "320ms" }}
+          >
             <div className="relative min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search customer name…"
-                className="w-full rounded-full border border-black/10 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2"
+                className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2"
                 style={{ ["--tw-ring-color" as string]: `${ACCENT}55` }}
               />
             </div>
             <select
               value={riskFilter}
               onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
-              className="rounded-full border border-black/10 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
             >
               <option value="all">All risk tiers</option>
               <option value="High">High risk</option>
@@ -822,7 +949,7 @@ export default function DashboardPage() {
             <select
               value={daysFilter}
               onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
-              className="rounded-full border border-black/10 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
             >
               <option value="all">Any days past due</option>
               <option value="1-30">1–30 days</option>
@@ -833,7 +960,7 @@ export default function DashboardPage() {
             <select
               value={segmentFilter}
               onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
-              className="rounded-full border border-black/10 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
               title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
             >
               <option value="all">All segments</option>
@@ -842,10 +969,13 @@ export default function DashboardPage() {
             </select>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-black/5 bg-white shadow-sm">
+          <div
+            className={`overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm ${revealClass(mounted)}`}
+            style={{ transitionDelay: "380ms" }}
+          >
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-black/5 text-left">
+                <tr className="border-b border-slate-100 text-left">
                   <th className="w-6 px-2 py-3" />
                   <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Customer</th>
                   <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Invoice #</th>
@@ -867,7 +997,7 @@ export default function DashboardPage() {
                     <tr
                       key={row.id}
                       onClick={() => setSelectedInvoiceId(row.id)}
-                      className="cursor-pointer border-b border-black/5 last:border-0 hover:bg-black/[0.02]"
+                      className="cursor-pointer border-b border-slate-100 transition-colors duration-150 last:border-0 hover:bg-slate-50"
                     >
                       <td className="px-2 py-3">{row.isAlert && <AlertDot />}</td>
                       <td className="px-4 py-3 text-slate-700">{row.customerName}</td>
@@ -902,7 +1032,7 @@ export default function DashboardPage() {
               drawerVisible ? "translate-x-0" : "translate-x-full"
             }`}
           >
-            <div className="flex items-center justify-between border-b border-black/5 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 p-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wide" style={{ color: ACCENT }}>
                   Collection Reminder
@@ -969,7 +1099,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="border-t border-black/5 p-5">
+            <div className="border-t border-slate-100 p-5">
               {(() => {
                 const state = sendState[selectedInvoice.id] ?? "idle";
                 const disabled = !selectedInvoice.customerEmail || state === "sending" || state === "sent";
