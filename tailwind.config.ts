@@ -9,8 +9,10 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#2f6bff",
-          dark: "#1f4ed8",
+          // Verve Advisory's official navy (sampled from the real logo), not a
+          // generic blue — keeps every bg-brand/text-brand accent on-brand.
+          DEFAULT: "#23408b",
+          dark: "#182d63",
         },
       },
       fontFamily: {

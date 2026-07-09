@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
@@ -16,6 +16,18 @@ interface FieldDef {
   required?: boolean;
   numeric?: boolean;
   date?: boolean;
+  /** Numeric fields only: value must be <= 0 (e.g. TDS, a deduction). */
+  nonPositive?: boolean;
+}
+
+// Fixed CVD-safe categorical order (validated palette) — cycled across columns
+// so a wide, horizontally-scrolled table stays trackable column-by-column,
+// Rainbow-CSV style. Never used for the Status column (that keeps its own
+// reserved green/red meaning).
+const COLUMN_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"];
+
+function columnColor(index: number): string {
+  return COLUMN_COLORS[index % COLUMN_COLORS.length];
 }
 
 const CUSTOMER_FIELDS: FieldDef[] = [
@@ -34,15 +46,192 @@ const CUSTOMER_FIELDS: FieldDef[] = [
 
 const INVOICE_FIELDS: FieldDef[] = [
   { key: "invoice_no", label: "Invoice No", required: true },
+  { key: "ref_no", label: "Ref No" },
   { key: "invoice_date", label: "Invoice Date", required: true, date: true },
   { key: "customer_code", label: "Customer Code", required: true },
   { key: "due_date", label: "Due Date (optional)", date: true },
   { key: "description", label: "Description", required: true },
   { key: "qty", label: "Qty", required: true, numeric: true },
   { key: "rate", label: "Rate", required: true, numeric: true },
-  { key: "tax_amount", label: "Tax Amount", numeric: true },
-  { key: "notes", label: "Notes" },
+  { key: "igst", label: "IGST", numeric: true },
+  { key: "cgst", label: "CGST", numeric: true },
+  { key: "sgst", label: "SGST", numeric: true },
+  { key: "tds", label: "TDS", numeric: true, nonPositive: true },
+  { key: "narration", label: "Narration" },
 ];
+
+// Example rows for the "download sample CSV" button. Headers are generated from
+// CUSTOMER_FIELDS/INVOICE_FIELDS above at click time (see buildSampleCsv), so the
+// downloaded file can never drift out of sync with the columns the preview expects
+// — only these example values need to stay hand-written.
+const SAMPLE_CUSTOMER_ROWS: Record<string, string>[] = [
+  {
+    code: "CUST101",
+    name: "Bluewave Logistics Pvt Ltd",
+    contact_person: "Sanjay Kulkarni",
+    email: "sanjay@bluewave.in",
+    phone: "+91 98220 44444",
+    address: "Pune",
+    gstin: "27AABCB4444D1Z4",
+    pan: "AABCB4444D",
+    credit_limit: "400000",
+    credit_days: "30",
+    opening_balance: "0",
+  },
+  {
+    code: "CUST102",
+    name: "Harborline Foods LLP",
+    contact_person: "Meera Iyer",
+    email: "meera@harborline.in",
+    phone: "+91 98450 55555",
+    address: "Chennai",
+    gstin: "33AABCH5555E1Z5",
+    pan: "AABCH5555E",
+    credit_limit: "250000",
+    credit_days: "15",
+    opening_balance: "5000",
+  },
+  {
+    code: "CUST103",
+    name: "",
+    contact_person: "Devika Nair",
+    email: "devika@orbitpack.in",
+    phone: "+91 98770 66666",
+    address: "Kochi",
+    gstin: "32AABCO6666F1Z6",
+    pan: "AABCO6666F",
+    credit_limit: "600000",
+    credit_days: "45",
+    opening_balance: "0",
+  },
+];
+
+// customer_name and taxable_value are shown here purely for reference — they mirror
+// the two computed/looked-up columns in the preview table (customer_name comes from
+// customer_code, taxable_value = qty*rate). Neither is a real input field, so both are
+// ignored if this same file is re-uploaded.
+const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
+  {
+    invoice_no: "INV-9001",
+    ref_no: "PO-5501",
+    invoice_date: "2026-06-01",
+    customer_code: "CUST001",
+    customer_name: "Sterling Textiles Pvt Ltd",
+    due_date: "",
+    description: "Cotton yarn - bulk order",
+    qty: "100",
+    rate: "450",
+    taxable_value: "45000",
+    igst: "",
+    cgst: "2250",
+    sgst: "2250",
+    tds: "-2500",
+    narration: "Bulk CSV import test",
+  },
+  {
+    invoice_no: "INV-9002",
+    ref_no: "PO-5502",
+    invoice_date: "2026-06-05",
+    customer_code: "CUST002",
+    customer_name: "Greenleaf Organics LLP",
+    due_date: "2026-06-20",
+    description: "Organic packaging supplies",
+    qty: "50",
+    rate: "220",
+    taxable_value: "11000",
+    igst: "1100",
+    cgst: "",
+    sgst: "",
+    tds: "",
+    narration: "",
+  },
+  {
+    invoice_no: "INV-9003",
+    ref_no: "PO-5503",
+    invoice_date: "2026-06-10",
+    customer_code: "CUST999",
+    customer_name: "",
+    due_date: "",
+    description: "Custom order",
+    qty: "20",
+    rate: "300",
+    taxable_value: "6000",
+    igst: "600",
+    cgst: "",
+    sgst: "",
+    tds: "",
+    narration: "Unknown customer code on purpose",
+  },
+  {
+    invoice_no: "INV-9004",
+    ref_no: "",
+    invoice_date: "2026-06-12",
+    customer_code: "CUST003",
+    customer_name: "Nimbus Software Solutions",
+    due_date: "",
+    description: "Software support retainer",
+    qty: "",
+    rate: "5000",
+    taxable_value: "",
+    igst: "",
+    cgst: "450",
+    sgst: "450",
+    tds: "300",
+    narration: "Missing qty on purpose (and TDS entered as positive on purpose)",
+  },
+];
+
+// Column order for the downloadable invoice template — matches the preview table
+// exactly (including the two reference-only computed columns), unlike INVOICE_FIELDS
+// above which is the real input/validation schema used for parsing and inserts.
+const INVOICE_SAMPLE_COLUMNS = [
+  "invoice_no",
+  "ref_no",
+  "invoice_date",
+  "customer_code",
+  "customer_name",
+  "due_date",
+  "description",
+  "qty",
+  "rate",
+  "taxable_value",
+  "igst",
+  "cgst",
+  "sgst",
+  "tds",
+  "narration",
+];
+
+function toCsvValue(v: string): string {
+  if (v.includes(",") || v.includes('"') || v.includes("\n")) {
+    return `"${v.replace(/"/g, '""')}"`;
+  }
+  return v;
+}
+
+function buildSampleCsv(type: UploadType): string {
+  if (type === "customers") {
+    const headerLine = CUSTOMER_FIELDS.map((f) => f.key).join(",");
+    const dataLines = SAMPLE_CUSTOMER_ROWS.map((r) => CUSTOMER_FIELDS.map((f) => toCsvValue(r[f.key] ?? "")).join(","));
+    return [headerLine, ...dataLines].join("\n") + "\n";
+  }
+  const headerLine = INVOICE_SAMPLE_COLUMNS.join(",");
+  const dataLines = SAMPLE_INVOICE_ROWS.map((r) => INVOICE_SAMPLE_COLUMNS.map((k) => toCsvValue(r[k] ?? "")).join(","));
+  return [headerLine, ...dataLines].join("\n") + "\n";
+}
+
+function downloadSampleCsv(type: UploadType) {
+  const csv = buildSampleCsv(type);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sample-${type}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 interface Row {
   id: string;
@@ -52,6 +241,7 @@ interface Row {
 interface CustomerLookup {
   id: string;
   code: string;
+  name: string;
   credit_days: number;
 }
 
@@ -59,7 +249,7 @@ function fieldsFor(type: UploadType): FieldDef[] {
   return type === "customers" ? CUSTOMER_FIELDS : INVOICE_FIELDS;
 }
 
-function rowErrors(type: UploadType, values: Record<string, string>, customerCodes: Set<string>): Record<string, string> {
+function rowErrors(type: UploadType, values: Record<string, string>, customersByCode: Map<string, CustomerLookup>): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const f of fieldsFor(type)) {
     const val = values[f.key]?.trim() ?? "";
@@ -72,11 +262,15 @@ function rowErrors(type: UploadType, values: Record<string, string>, customerCod
       errors[f.key] = "Must be a number";
       continue;
     }
+    if (f.nonPositive && Number(val) > 0) {
+      errors[f.key] = "Must be zero or negative (it's a deduction)";
+      continue;
+    }
     if (f.date && Number.isNaN(Date.parse(val))) {
       errors[f.key] = "Invalid date";
       continue;
     }
-    if (type === "invoices" && f.key === "customer_code" && !customerCodes.has(val)) {
+    if (type === "invoices" && f.key === "customer_code" && !customersByCode.has(val)) {
       errors[f.key] = "No matching customer";
     }
   }
@@ -89,16 +283,43 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function taxableValue(v: Record<string, string>): number {
+  const qty = Number(v.qty) || 0;
+  const rate = Number(v.rate) || 0;
+  return qty * rate;
+}
+
+function money(n: number): string {
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
 export default function UploadPage() {
   const [type, setType] = useState<UploadType>("customers");
   const [rows, setRows] = useState<Row[]>([]);
   const [customers, setCustomers] = useState<CustomerLookup[]>([]);
   const [inserting, setInserting] = useState(false);
   const [result, setResult] = useState<{ inserted: number; failed: number; messages: string[] } | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   async function loadCustomers() {
     if (!supabase) return;
-    const { data } = await supabase.from("customers").select("id,code,credit_days");
+    const { data } = await supabase.from("customers").select("id,code,name,credit_days");
     setCustomers(data ?? []);
   }
 
@@ -107,7 +328,7 @@ export default function UploadPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const customerCodes = useMemo(() => new Set(customers.map((c) => c.code)), [customers]);
+  const customersByCode = useMemo(() => new Map(customers.map((c) => [c.code, c])), [customers]);
 
   if (!isConfigured || !supabase) {
     return <NotConfigured />;
@@ -117,6 +338,10 @@ export default function UploadPage() {
     setType(next);
     setRows([]);
     setResult(null);
+  }
+
+  function scrollPreview(delta: number) {
+    scrollRef.current?.scrollBy({ left: delta, behavior: "smooth" });
   }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -138,7 +363,7 @@ export default function UploadPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, values: { ...r.values, [key]: value } } : r)));
   }
 
-  const validRows = rows.filter((r) => Object.keys(rowErrors(type, r.values, customerCodes)).length === 0);
+  const validRows = rows.filter((r) => Object.keys(rowErrors(type, r.values, customersByCode)).length === 0);
   const invalidCount = rows.length - validRows.length;
 
   async function handleInsertAll() {
@@ -172,19 +397,29 @@ export default function UploadPage() {
     } else {
       for (const row of validRows) {
         const v = row.values;
-        const customer = customers.find((c) => c.code === v.customer_code.trim());
+        const customer = customersByCode.get(v.customer_code.trim());
         if (!customer) {
           failures.push({ id: row.id, message: "Customer not found" });
           continue;
         }
         const qty = Number(v.qty);
         const rate = Number(v.rate);
-        const amount = qty * rate;
-        const taxAmount = Number(v.tax_amount) || 0;
-        const total = amount + taxAmount;
+        const subtotal = qty * rate;
+        const taxAmount = (Number(v.igst) || 0) + (Number(v.cgst) || 0) + (Number(v.sgst) || 0);
+        const tds = Number(v.tds) || 0; // always <= 0 by validation — a deduction before payment
+        const total = subtotal + taxAmount + tds;
         const dueDate = v.due_date.trim() || addDays(v.invoice_date.trim(), customer.credit_days);
         const today = new Date().toISOString().slice(0, 10);
         const status: InvoiceStatus = dueDate < today ? "overdue" : "open";
+        // invoices has no dedicated ref_no/TDS column, so fold both into the narration
+        // rather than lose them — never adding a column per the "don't touch the backend" rule.
+        const refNo = v.ref_no.trim();
+        const narrationParts = [
+          refNo && `Ref: ${refNo}`,
+          tds !== 0 && `TDS: ${tds}`,
+          v.narration.trim(),
+        ].filter(Boolean);
+        const notes = narrationParts.length > 0 ? narrationParts.join(" — ") : null;
 
         const { data: invoiceData, error: invoiceError } = await supabase
           .from("invoices")
@@ -193,11 +428,11 @@ export default function UploadPage() {
             invoice_date: v.invoice_date.trim(),
             customer_id: customer.id,
             due_date: dueDate,
-            subtotal: amount,
+            subtotal,
             tax_amount: taxAmount,
             total,
             status,
-            notes: v.notes.trim() || null,
+            notes,
           })
           .select("id")
           .single();
@@ -212,7 +447,7 @@ export default function UploadPage() {
           description: v.description.trim(),
           qty,
           rate,
-          amount,
+          amount: subtotal,
         });
 
         if (itemError) {
@@ -232,41 +467,90 @@ export default function UploadPage() {
     setInserting(false);
   }
 
-  const columns: Column<Row>[] = [
-    ...fieldsFor(type).map((f) => ({
+  function editableColumn(f: FieldDef, colorIndex: number): Column<Row> {
+    return {
       key: f.key,
       header: f.label,
+      className: f.numeric ? "text-right" : undefined,
+      accentColor: columnColor(colorIndex),
       render: (row: Row) => {
-        const errors = rowErrors(type, row.values, customerCodes);
+        const errors = rowErrors(type, row.values, customersByCode);
         const hasError = Boolean(errors[f.key]);
         return (
           <input
             value={row.values[f.key]}
             onChange={(e) => updateCell(row.id, f.key, e.target.value)}
             title={errors[f.key] ?? ""}
-            className={`w-full min-w-[8rem] rounded border px-2 py-1 text-xs outline-none focus:border-brand focus:ring-1 focus:ring-brand ${
-              hasError ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"
-            }`}
+            className={`w-full min-w-[7rem] rounded border px-2 py-1 text-xs outline-none focus:border-brand focus:ring-1 focus:ring-brand ${
+              f.numeric ? "text-right tabular-nums" : ""
+            } ${hasError ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
           />
         );
       },
-    })),
-    {
-      key: "__status",
-      header: "Status",
-      render: (row: Row) => {
-        const errors = rowErrors(type, row.values, customerCodes);
-        const count = Object.keys(errors).length;
-        return count === 0 ? (
-          <span className="whitespace-nowrap text-xs font-semibold text-emerald-600">OK</span>
-        ) : (
-          <span className="whitespace-nowrap text-xs font-semibold text-red-600">
-            {count} issue{count > 1 ? "s" : ""}
-          </span>
-        );
-      },
+    };
+  }
+
+  const statusColumn: Column<Row> = {
+    key: "__status",
+    header: "Status",
+    render: (row: Row) => {
+      const errors = rowErrors(type, row.values, customersByCode);
+      const count = Object.keys(errors).length;
+      return count === 0 ? (
+        <span className="whitespace-nowrap text-xs font-semibold text-emerald-600">OK</span>
+      ) : (
+        <span className="whitespace-nowrap text-xs font-semibold text-red-600">
+          {count} issue{count > 1 ? "s" : ""}
+        </span>
+      );
     },
-  ];
+  };
+
+  const invoiceField = (key: string) => INVOICE_FIELDS.find((f) => f.key === key)!;
+
+  const columns: Column<Row>[] =
+    type === "customers"
+      ? [...CUSTOMER_FIELDS.map((f, i) => editableColumn(f, i)), statusColumn]
+      : [
+          editableColumn(invoiceField("invoice_no"), 0),
+          editableColumn(invoiceField("ref_no"), 1),
+          editableColumn(invoiceField("invoice_date"), 2),
+          editableColumn(invoiceField("customer_code"), 3),
+          {
+            key: "__customer_name",
+            header: "Customer Name",
+            accentColor: columnColor(4),
+            render: (row: Row) => {
+              const customer = customersByCode.get(row.values.customer_code.trim());
+              return customer ? (
+                <span className="whitespace-nowrap text-xs text-slate-600">{customer.name}</span>
+              ) : (
+                <span className="text-xs italic text-slate-300">—</span>
+              );
+            },
+          },
+          editableColumn(invoiceField("due_date"), 5),
+          editableColumn(invoiceField("description"), 6),
+          editableColumn(invoiceField("qty"), 7),
+          editableColumn(invoiceField("rate"), 0),
+          {
+            key: "__taxable_value",
+            header: "Taxable Value-Qty*Rate",
+            className: "text-right",
+            accentColor: columnColor(1),
+            render: (row: Row) => (
+              <span className="whitespace-nowrap text-xs font-medium tabular-nums text-slate-700">
+                {money(taxableValue(row.values))}
+              </span>
+            ),
+          },
+          editableColumn(invoiceField("igst"), 2),
+          editableColumn(invoiceField("cgst"), 3),
+          editableColumn(invoiceField("sgst"), 4),
+          editableColumn(invoiceField("tds"), 5),
+          editableColumn(invoiceField("narration"), 6),
+          statusColumn,
+        ];
 
   return (
     <div>
@@ -297,13 +581,13 @@ export default function UploadPage() {
           </button>
         </div>
 
-        <a
-          href={type === "customers" ? "/samples/sample-customers.csv" : "/samples/sample-invoices.csv"}
-          download
+        <button
+          type="button"
+          onClick={() => downloadSampleCsv(type)}
           className="text-sm font-medium text-brand hover:underline"
         >
           Download sample {type} CSV
-        </a>
+        </button>
 
         <label className="ml-auto cursor-pointer rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
           Choose CSV file
@@ -318,39 +602,61 @@ export default function UploadPage() {
       )}
 
       {rows.length > 0 && (
-        <>
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-slate-600">
-              <span className="font-semibold text-slate-900">{rows.length}</span> row{rows.length > 1 ? "s" : ""} parsed —{" "}
-              <span className="font-semibold text-emerald-600">{validRows.length} ready</span>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-slate-800">Preview</p>
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+                {rows.length} row{rows.length > 1 ? "s" : ""}
+              </span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                {validRows.length} ready
+              </span>
               {invalidCount > 0 && (
-                <>
-                  {" "}
-                  · <span className="font-semibold text-red-600">{invalidCount} with issues</span>
-                </>
+                <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                  {invalidCount} issue{invalidCount > 1 ? "s" : ""}
+                </span>
               )}
-            </p>
-            <button
-              type="button"
-              disabled={validRows.length === 0 || inserting}
-              onClick={handleInsertAll}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {inserting ? "Inserting…" : `Insert ${validRows.length} valid row${validRows.length === 1 ? "" : "s"}`}
-            </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => scrollPreview(-320)}
+                aria-label="Scroll preview left"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:border-brand hover:text-brand"
+              >
+                <ChevronLeftIcon />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollPreview(320)}
+                aria-label="Scroll preview right"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition-colors hover:border-brand hover:text-brand"
+              >
+                <ChevronRightIcon />
+              </button>
+              <button
+                type="button"
+                disabled={validRows.length === 0 || inserting}
+                onClick={handleInsertAll}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {inserting ? "Inserting…" : `Insert ${validRows.length} valid row${validRows.length === 1 ? "" : "s"}`}
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <DataTable columns={columns} rows={rows} />
+          <div ref={scrollRef} className="overflow-x-auto">
+            <DataTable columns={columns} rows={rows} bare />
           </div>
 
           {invalidCount > 0 && (
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="border-t border-slate-100 bg-slate-50/50 px-4 py-2 text-xs text-slate-500">
               Rows with issues are highlighted red. Fix the value directly in the table (hover a red box to see why),
               or fix the CSV and re-upload it.
             </p>
           )}
-        </>
+        </div>
       )}
 
       {result && (
