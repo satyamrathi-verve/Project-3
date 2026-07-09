@@ -129,7 +129,7 @@ export default function InvoiceListPage() {
             >
               {name.charAt(0).toUpperCase()}
             </span>
-            <span className="font-medium text-slate-800">{name}</span>
+            <span className="font-medium text-slate-800 dark:text-slate-100">{name}</span>
           </div>
         );
       },
@@ -138,7 +138,7 @@ export default function InvoiceListPage() {
     {
       key: "total",
       header: "Total Invoice Value",
-      render: (i) => <span className="font-semibold text-slate-900">{money(i.total)}</span>,
+      render: (i) => <span className="font-semibold text-slate-900 dark:text-white">{money(i.total)}</span>,
     },
     {
       key: "overdue_days",
@@ -162,7 +162,7 @@ export default function InvoiceListPage() {
         return out <= 0 ? (
           <span className="text-sm font-medium text-emerald-600">Paid in full</span>
         ) : (
-          <span className={`font-semibold ${overdueDays(i) > 0 ? "text-rose-600" : "text-slate-700"}`}>
+          <span className={`font-semibold ${overdueDays(i) > 0 ? "text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"}`}>
             {money(out)}
           </span>
         );

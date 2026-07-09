@@ -14,6 +14,17 @@ body {
   @apply bg-slate-50 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100;
 }
 
+/*
+  `brand` is a dark navy, used as a text/link color in ~15 screens across the
+  app. On dark backgrounds that navy is nearly invisible, and adding a
+  dark:text-* companion to every single usage individually would be error
+  prone. One override here lightens it everywhere text-brand is used as text,
+  without touching bg-brand/border-brand (which don't have this problem).
+*/
+.dark .text-brand {
+  color: #7fa6f0;
+}
+
 @keyframes bar-rise {
   from {
     transform: scaleY(0);

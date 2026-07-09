@@ -229,7 +229,7 @@ export default function CustomerMasterPage() {
           >
             {c.name.charAt(0).toUpperCase()}
           </span>
-          <span className="font-medium text-slate-800">{c.name}</span>
+          <span className="font-medium text-slate-800 dark:text-slate-100">{c.name}</span>
         </div>
       ),
     },
@@ -259,12 +259,12 @@ export default function CustomerMasterPage() {
     {
       key: "gstin",
       header: "GST Number",
-      render: (c) => <span className="font-mono text-sm font-bold text-slate-700">{c.gstin ?? "—"}</span>,
+      render: (c) => <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-300">{c.gstin ?? "—"}</span>,
     },
     {
       key: "pan",
       header: "PAN",
-      render: (c) => <span className="font-mono text-sm font-bold text-slate-700">{c.pan ?? "—"}</span>,
+      render: (c) => <span className="font-mono text-sm font-bold text-slate-700 dark:text-slate-300">{c.pan ?? "—"}</span>,
     },
     { key: "credit_limit", header: "Credit Limit", render: (c) => money(c.credit_limit) },
     {
@@ -272,7 +272,7 @@ export default function CustomerMasterPage() {
       header: "Net Receivable",
       render: (c) => {
         const amt = netReceivable[c.id] ?? c.opening_balance;
-        return <span className={amt > c.credit_limit ? "font-semibold text-rose-600" : "text-slate-700"}>{money(amt)}</span>;
+        return <span className={amt > c.credit_limit ? "font-semibold text-rose-600 dark:text-rose-400" : "text-slate-700 dark:text-slate-300"}>{money(amt)}</span>;
       },
     },
     {

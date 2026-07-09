@@ -572,7 +572,7 @@ export default function ReceiptEntryPage() {
       header: "Receipt",
       render: (r) => (
         <div>
-          <p className="font-semibold text-slate-800">{r.receipt_no}</p>
+          <p className="font-semibold text-slate-800 dark:text-slate-100">{r.receipt_no}</p>
           {r.reference && <p className="text-xs text-slate-400">{r.reference}</p>}
         </div>
       ),
@@ -584,7 +584,7 @@ export default function ReceiptEntryPage() {
         <div className="flex items-center gap-3">
           <Avatar name={r.customer_name} />
           <div>
-            <p className="font-medium text-slate-800">{r.customer_name}</p>
+            <p className="font-medium text-slate-800 dark:text-slate-100">{r.customer_name}</p>
             <p className="text-xs text-slate-400">{r.customer_code}</p>
           </div>
         </div>
@@ -592,7 +592,7 @@ export default function ReceiptEntryPage() {
     },
     { key: "receipt_date", header: "Date" },
     { key: "mode", header: "Mode", render: (r) => <ModeBadge mode={r.mode} /> },
-    { key: "amount", header: "Amount", render: (r) => <span className="font-semibold text-slate-800">{money(Number(r.amount))}</span> },
+    { key: "amount", header: "Amount", render: (r) => <span className="font-semibold text-slate-800 dark:text-slate-100">{money(Number(r.amount))}</span> },
     {
       key: "allocation",
       header: "Allocation",
@@ -628,21 +628,21 @@ export default function ReceiptEntryPage() {
 
   return (
     <>
-      <nav className="mb-2 text-xs text-slate-400">
-        <Link href="/" className="hover:text-slate-600">Home</Link>
+      <nav className="mb-2 text-xs text-slate-400 dark:text-slate-500">
+        <Link href="/" className="hover:text-slate-600 dark:hover:text-slate-300">Home</Link>
         <span className="mx-1.5">/</span>
         <span>Accounts Receivable</span>
         <span className="mx-1.5">/</span>
         {formOpen ? (
           <>
-            <Link href="/receipts" onClick={(e) => { e.preventDefault(); attemptClose(); }} className="hover:text-slate-600">
+            <Link href="/receipts" onClick={(e) => { e.preventDefault(); attemptClose(); }} className="hover:text-slate-600 dark:hover:text-slate-300">
               Receipts
             </Link>
             <span className="mx-1.5">/</span>
-            <span className="text-slate-600">{editingId ? "Edit Receipt" : "New Receipt"}</span>
+            <span className="text-slate-600 dark:text-slate-300">{editingId ? "Edit Receipt" : "New Receipt"}</span>
           </>
         ) : (
-          <span className="text-slate-600">Receipts</span>
+          <span className="text-slate-600 dark:text-slate-300">Receipts</span>
         )}
       </nav>
 
