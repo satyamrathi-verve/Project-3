@@ -9,3 +9,17 @@
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
 }
+
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+.animate-bar-rise {
+  transform-origin: bottom;
+  animation: bar-rise 1s ease-out both;
+}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { clearSession, type Session } from "@/lib/auth";
 
 /*
   Left sidebar. Only "Home" exists to start with — everything else is the roadmap
@@ -11,7 +12,7 @@ import { usePathname } from "next/navigation";
 */
 const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/", label: "Home", built: true },
-  { href: "/signin", label: "Sign In", built: false },
+  { href: "/signin", label: "Sign In", built: true },
   { href: "/masters/customers", label: "Customer Master", built: false },
   { href: "/masters/gl", label: "GL Master", built: false },
   { href: "/invoices", label: "Sales Invoices", built: false },
@@ -24,7 +25,7 @@ const LINKS: { href: string; label: string; built: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", built: false },
 ];
 
-export function Nav() {
+export function Nav({ session }: { session: Session }) {
   const pathname = usePathname();
 
   return (
@@ -60,6 +61,21 @@ export function Nav() {
           </Link>
         );
       })}
+
+      <div className="mt-auto border-t border-slate-200 pt-3">
+        <p className="truncate px-2 text-sm font-medium text-slate-700">{session.name}</p>
+        <p className="truncate px-2 text-xs text-slate-400">{session.email}</p>
+        <button
+          type="button"
+          onClick={() => {
+            clearSession();
+            window.location.href = "/";
+          }}
+          className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        >
+          Sign out
+        </button>
+      </div>
     </nav>
   );
 }
