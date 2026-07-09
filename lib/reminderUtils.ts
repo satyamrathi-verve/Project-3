@@ -59,3 +59,27 @@ export const AGEING_BUCKET_STYLES: Record<
     label: "90+ days",
   },
 };
+
+/*
+  Each ageing bucket has its own escalating reminder template, matched by name
+  (the reminder_templates table has no bucket column, so the name is the key).
+  Ordered for display: mildest tier first, final-notice tier last.
+*/
+export const BUCKET_TEMPLATE_NAME: Record<AgeingBucket, string> = {
+  "0-30": "0-30 Days Overdue",
+  "31-60": "30-60 Days Overdue",
+  "61-90": "61-90 Days Overdue",
+  "90+": "90+ Days Overdue",
+};
+
+export const AGEING_BUCKET_ORDER: AgeingBucket[] = ["0-30", "31-60", "61-90", "90+"];
+
+export function templateForDays<T extends { name: string }>(templates: T[], days: number): T | null {
+  const wantedName = BUCKET_TEMPLATE_NAME[ageingBucket(days)];
+  return (
+    templates.find((t) => t.name === wantedName) ??
+    templates.find((t) => t.name === BUCKET_TEMPLATE_NAME["0-30"]) ??
+    templates[0] ??
+    null
+  );
+}

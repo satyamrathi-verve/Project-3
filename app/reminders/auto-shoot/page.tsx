@@ -12,6 +12,7 @@ import {
   formatCurrency,
   ageingBucket,
   AGEING_BUCKET_STYLES,
+  templateForDays,
   type AgeingBucket,
 } from "@/lib/reminderUtils";
 import type { ReminderTemplate } from "@/lib/types";
@@ -63,7 +64,7 @@ function wasChasedRecently(g: CustomerGroup) {
 
 export default function AutoEmailShootPage() {
   const [loading, setLoading] = useState(true);
-  const [template, setTemplate] = useState<ReminderTemplate | null>(null);
+  const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
   const [companyName, setCompanyName] = useState("Verve Advisory");
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([]);
   const [allDueInvoices, setAllDueInvoices] = useState<DueInvoice[]>([]);
@@ -86,8 +87,8 @@ export default function AutoEmailShootPage() {
     setLoading(true);
     const todayIso = new Date().toISOString().slice(0, 10);
 
-    const [{ data: templates }, { data: company }, { data: rawInvoices }] = await Promise.all([
-      supabase.from("reminder_templates").select("*").order("name").limit(1),
+    const [{ data: fetchedTemplates }, { data: company }, { data: rawInvoices }] = await Promise.all([
+      supabase.from("reminder_templates").select("*").order("name"),
       supabase.from("company").select("name").limit(1).maybeSingle(),
       supabase
         .from("invoices")
@@ -96,8 +97,8 @@ export default function AutoEmailShootPage() {
         .order("due_date"),
     ]);
 
-    const tmpl = (templates as ReminderTemplate[] | null)?.[0] ?? null;
-    setTemplate(tmpl);
+    const tmpls = (fetchedTemplates as ReminderTemplate[] | null) ?? [];
+    setTemplates(tmpls);
     if (company?.name) setCompanyName(company.name);
 
     const invoiceRows = rawInvoices ?? [];
@@ -290,17 +291,22 @@ export default function AutoEmailShootPage() {
     };
   }
 
+  function templateFor(g: CustomerGroup) {
+    return templateForDays(templates, g.oldestDaysOverdue);
+  }
+
   function previewFor(g: CustomerGroup) {
-    if (!template) return { subject: "", body: "" };
+    const tmpl = templateFor(g);
+    if (!tmpl) return { subject: "", body: "" };
     const sample = buildCustomerSample(g);
     return {
-      subject: fillPlaceholders(template.subject, sample),
-      body: fillPlaceholders(template.body, sample),
+      subject: fillPlaceholders(tmpl.subject, sample),
+      body: fillPlaceholders(tmpl.body, sample),
     };
   }
 
   async function handleSendAll() {
-    if (!supabase || !template) return;
+    if (!supabase || templates.length === 0) return;
     const toSend = customerGroups.filter((g) => selectedIds.has(g.customer_id) && g.customer_email);
     if (toSend.length === 0) return;
 
@@ -398,7 +404,7 @@ export default function AutoEmailShootPage() {
               </button>
               <button
                 onClick={handleSendAll}
-                disabled={sending || selectedIds.size === 0 || !template}
+                disabled={sending || selectedIds.size === 0 || templates.length === 0}
                 className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark disabled:opacity-50"
               >
                 {sending
@@ -469,9 +475,9 @@ export default function AutoEmailShootPage() {
         )
       ) : loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Loading overdue invoices…</p>
-      ) : !template ? (
+      ) : templates.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">
-          No reminder template found —{" "}
+          No reminder templates found —{" "}
           <Link href="/reminders" className="text-brand hover:underline">
             build the Reminder Template screen first
           </Link>
@@ -480,9 +486,10 @@ export default function AutoEmailShootPage() {
       ) : (
         <>
           <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
-            Emails are generated from your saved Reminder Template —{" "}
+            Each customer gets the reminder tuned to how overdue they are — mild at 0–30 days,
+            escalating up to a final notice past 90 —{" "}
             <Link href="/reminders" className="font-medium text-brand hover:underline">
-              edit it here
+              edit those templates here
             </Link>
             .
           </p>
@@ -662,6 +669,12 @@ export default function AutoEmailShootPage() {
                           className="mt-4 cursor-default rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800"
                         >
                           <p className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                            Using template
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">
+                            {templateFor(g)?.name ?? "No matching template"}
+                          </p>
+                          <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
                             To
                           </p>
                           <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-100">

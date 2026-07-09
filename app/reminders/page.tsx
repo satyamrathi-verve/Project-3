@@ -5,7 +5,17 @@ import { supabase, isConfigured } from "@/lib/supabase";
 import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
 import { inputClass } from "@/components/FormField";
-import { fillPlaceholders, formatDate, daysOverdue, formatCurrency } from "@/lib/reminderUtils";
+import {
+  fillPlaceholders,
+  formatDate,
+  daysOverdue,
+  formatCurrency,
+  ageingBucket,
+  AGEING_BUCKET_STYLES,
+  AGEING_BUCKET_ORDER,
+  BUCKET_TEMPLATE_NAME,
+  type AgeingBucket,
+} from "@/lib/reminderUtils";
 import type { ReminderTemplate } from "@/lib/types";
 
 const PLACEHOLDERS = [
@@ -18,31 +28,6 @@ const PLACEHOLDERS = [
   "{company_name}",
   "{payment_link}",
 ];
-
-const DEFAULT_SUBJECT =
-  "Payment Reminder – Invoice {invoice_no} | {days_overdue} Days Overdue";
-
-const DEFAULT_BODY = `Dear {customer},
-
-I hope you're doing well.
-
-This is a gentle reminder regarding the outstanding payment for the invoice mentioned below:
-
-Invoice No.: {invoice_no}
-Invoice Date: {invoice_date}
-Outstanding Amount: {amount}
-Due Date: {due_date}
-Days Overdue: {days_overdue}
-
-We kindly request you to process the payment at the earliest. If the payment has already been made, please disregard this email and share the payment details so we can update our records.
-
-If there are any concerns regarding the invoice or if you require any additional information, please feel free to reach out. We will be happy to assist.
-
-We appreciate your prompt attention to this matter and look forward to your confirmation.
-
-Warm regards,
-Team Accounts
-Verve Advisory.`;
 
 interface InvoiceOption {
   id: string;
@@ -68,10 +53,12 @@ const SAMPLE_FALLBACK = {
 type Mode = "edit" | "preview";
 
 export default function ReminderTemplatePage() {
+  const [templates, setTemplates] = useState<ReminderTemplate[]>([]);
+  const [activeBucket, setActiveBucket] = useState<AgeingBucket>("0-30");
   const [templateId, setTemplateId] = useState<string | null>(null);
-  const [subject, setSubject] = useState(DEFAULT_SUBJECT);
-  const [body, setBody] = useState(DEFAULT_BODY);
-  const [initial, setInitial] = useState({ subject: DEFAULT_SUBJECT, body: DEFAULT_BODY });
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [initial, setInitial] = useState({ subject: "", body: "" });
   const [companyName, setCompanyName] = useState("Verve Advisory");
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>("edit");
@@ -98,20 +85,23 @@ export default function ReminderTemplatePage() {
       return;
     }
     Promise.all([
-      supabase.from("reminder_templates").select("*").order("name").limit(1),
+      supabase.from("reminder_templates").select("*").order("name"),
       supabase.from("company").select("name").limit(1).maybeSingle(),
       supabase
         .from("invoices")
         .select("id, invoice_no, invoice_date, due_date, total, customer_id, customers(name, email)")
         .in("status", ["open", "partial", "overdue"])
         .order("due_date"),
-    ]).then(([{ data: templates }, { data: company }, { data: invoices }]) => {
-      const row = (templates as ReminderTemplate[] | null)?.[0];
-      if (row) {
-        setTemplateId(row.id);
-        setSubject(row.subject);
-        setBody(row.body);
-        setInitial({ subject: row.subject, body: row.body });
+    ]).then(([{ data: fetchedTemplates }, { data: company }, { data: invoices }]) => {
+      const rows = (fetchedTemplates as ReminderTemplate[] | null) ?? [];
+      setTemplates(rows);
+      const defaultRow = rows.find((t) => t.name === BUCKET_TEMPLATE_NAME["0-30"]) ?? rows[0];
+      if (defaultRow) {
+        setActiveBucket("0-30");
+        setTemplateId(defaultRow.id);
+        setSubject(defaultRow.subject);
+        setBody(defaultRow.body);
+        setInitial({ subject: defaultRow.subject, body: defaultRow.body });
       }
       if (company?.name) setCompanyName(company.name);
       if (invoices) {
@@ -134,11 +124,23 @@ export default function ReminderTemplatePage() {
 
   const selectedInvoice = invoiceOptions.find((i) => i.id === selectedInvoiceId) ?? null;
 
+  function selectBucket(bucket: AgeingBucket) {
+    const row = templates.find((t) => t.name === BUCKET_TEMPLATE_NAME[bucket]);
+    if (!row) return;
+    setActiveBucket(bucket);
+    setTemplateId(row.id);
+    setSubject(row.subject);
+    setBody(row.body);
+    setInitial({ subject: row.subject, body: row.body });
+    setSavedMessage(null);
+  }
+
   useEffect(() => {
     if (!selectedInvoice || !supabase) {
       setLiveSample(null);
       return;
     }
+    selectBucket(ageingBucket(daysOverdue(selectedInvoice.due_date)));
     setFetchingInvoice(true);
     supabase
       .from("receipt_allocations")
@@ -158,6 +160,7 @@ export default function ReminderTemplatePage() {
         });
         setFetchingInvoice(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInvoice]);
 
   const sample = useMemo(
@@ -369,6 +372,30 @@ export default function ReminderTemplatePage() {
                   {sending ? "Sending…" : "Send"}
                 </button>
               </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {AGEING_BUCKET_ORDER.map((bucket) => {
+                const styles = AGEING_BUCKET_STYLES[bucket];
+                const active = bucket === activeBucket;
+                const available = templates.some((t) => t.name === BUCKET_TEMPLATE_NAME[bucket]);
+                return (
+                  <button
+                    key={bucket}
+                    type="button"
+                    disabled={!available}
+                    onClick={() => selectBucket(bucket)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+                      active
+                        ? styles.badge
+                        : "bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <span className={`h-2 w-2 rounded-full ${styles.dot}`} />
+                    {styles.label} overdue
+                  </button>
+                );
+              })}
             </div>
 
             {mode === "edit" ? (
