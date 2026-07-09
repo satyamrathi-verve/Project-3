@@ -14,13 +14,13 @@
   never add columns/tables (CLAUDE.md rule: never touch the backend):
     - "Collector" (assigned analyst) — no such field on customers/invoices.
       Omitted rather than faked; would need a real column to be honest.
-    - "Dispute reason" breakdown — no dispute/reason field anywhere. Shown as
-      an explicit "not tracked yet" card instead of invented percentages.
     - Year-over-year / month-over-month trend arrows (like the reference
       image) — we have no historical AR snapshots to compute a real trend
       from, so none are shown rather than faking one.
-  "Customer Segment" (Enterprise/SMB) IS derived below from credit_limit,
-  which is a real stored field — documented at ENTERPRISE_CREDIT_LIMIT.
+  Dispute Breakdown was dropped entirely (not just hidden) — same reasoning,
+  no dispute-reason field exists anywhere in this schema.
+  "Customer Segment" (Enterprise/SMB) and "Customers by City" ARE derived
+  below from real stored fields (credit_limit, address) — not invented.
 */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -92,6 +92,16 @@ interface DonutSegment {
   label: string;
   value: number;
   color: string;
+}
+
+interface RankedItem {
+  label: string;
+  value: number;
+}
+
+interface MonthPoint {
+  label: string;
+  amount: number;
 }
 
 const RISK_STYLES: Record<RiskTier, string> = {
@@ -260,7 +270,15 @@ function CashForecastChart({ points }: { points: WeekPoint[] }) {
   );
 }
 
-function DonutChart({ title, segments }: { title: string; segments: DonutSegment[] }) {
+function DonutChart({
+  title,
+  segments,
+  formatValue = (v: number) => String(v),
+}: {
+  title: string;
+  segments: DonutSegment[];
+  formatValue?: (v: number) => string;
+}) {
   const total = segments.reduce((s, x) => s + x.value, 0);
   let cumulative = 0;
   const stops = segments
@@ -281,7 +299,7 @@ function DonutChart({ title, segments }: { title: string; segments: DonutSegment
           style={{ background: total > 0 ? `conic-gradient(${stops})` : "#f1f5f9" }}
         >
           <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-white text-center">
-            <p className="text-lg font-extrabold text-slate-900">{total}</p>
+            <p className="text-sm font-extrabold leading-tight text-slate-900">{formatValue(total)}</p>
             <p className="text-[9px] uppercase tracking-wide text-slate-400">Total</p>
           </div>
         </div>
@@ -290,7 +308,7 @@ function DonutChart({ title, segments }: { title: string; segments: DonutSegment
             <div key={seg.label} className="flex items-center gap-2 text-xs">
               <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: seg.color }} />
               <span className="text-slate-500">{seg.label}</span>
-              <span className="font-bold text-slate-900">{seg.value}</span>
+              <span className="font-bold text-slate-900">{formatValue(seg.value)}</span>
             </div>
           ))}
         </div>
@@ -299,15 +317,58 @@ function DonutChart({ title, segments }: { title: string; segments: DonutSegment
   );
 }
 
-function DisputeBreakdownPlaceholder() {
+function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-dashed border-black/10 bg-white/60 p-5">
-      <p className="text-sm font-bold text-slate-900">Dispute Breakdown</p>
-      <p className="mt-2 flex-1 text-xs text-slate-500">
-        Not tracked yet — there&apos;s no dispute-reason field on invoices in this database, so this can&apos;t show
-        real numbers. Ask the team if invoices should carry a reason (pricing, missing PO, damaged goods) before
-        building this out; adding it means altering the schema, which this app never does on its own.
-      </p>
+    <div className="rounded-2xl border border-black/5 bg-white p-5 shadow-sm">
+      <p className="mb-4 text-sm font-bold text-slate-900">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function RankedBarList({
+  items,
+  formatValue,
+  color,
+}: {
+  items: RankedItem[];
+  formatValue: (v: number) => string;
+  color: string;
+}) {
+  const max = Math.max(1, ...items.map((i) => i.value));
+  if (items.length === 0) return <p className="text-xs text-slate-400">No data yet.</p>;
+  return (
+    <div className="space-y-2.5">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-3">
+          <span className="w-24 flex-none truncate text-xs text-slate-500" title={item.label}>
+            {item.label}
+          </span>
+          <div className="h-4 flex-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full rounded-full" style={{ width: `${(item.value / max) * 100}%`, backgroundColor: color }} />
+          </div>
+          <span className="w-16 flex-none text-right text-xs font-bold text-slate-800">{formatValue(item.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MonthlyTrendChart({ points }: { points: MonthPoint[] }) {
+  const max = Math.max(1, ...points.map((p) => p.amount));
+  const barArea = 110;
+  return (
+    <div className="flex items-end gap-2" style={{ height: barArea + 44 }}>
+      {points.map((p) => (
+        <div key={p.label} className="flex flex-1 flex-col items-center justify-end gap-1.5">
+          <span className="text-[10px] font-bold text-slate-700">{formatCurrency(p.amount)}</span>
+          <div
+            className="w-full rounded-t-lg"
+            style={{ height: `${Math.max(6, (p.amount / max) * barArea)}px`, backgroundColor: ACCENT }}
+          />
+          <span className="text-[10px] text-slate-400">{p.label}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -520,14 +581,70 @@ export default function DashboardPage() {
     ];
   }, [invoiceRows]);
 
+  // Amount-based (not headcount) — a handful of large Enterprise accounts can
+  // dominate exposure far more than their share of the customer count.
   const segmentDonut: DonutSegment[] = useMemo(() => {
-    const enterprise = customers.filter((c) => c.credit_limit >= ENTERPRISE_CREDIT_LIMIT).length;
-    const smb = customers.length - enterprise;
+    let enterprise = 0;
+    let smb = 0;
+    for (const r of openRows) {
+      if (r.segment === "Enterprise") enterprise += r.outstanding;
+      else smb += r.outstanding;
+    }
     return [
-      { label: "Enterprise", value: enterprise, color: "#1f2937" },
-      { label: "SMB", value: smb, color: ACCENT },
+      { label: "Enterprise", value: Math.round(enterprise), color: "#1f2937" },
+      { label: "SMB", value: Math.round(smb), color: ACCENT },
     ];
+  }, [openRows]);
+
+  const paymentModeDonut: DonutSegment[] = useMemo(() => {
+    const MODE_LABELS: Record<string, string> = { cash: "Cash", cheque: "Cheque", upi: "UPI", neft: "NEFT" };
+    const MODE_COLORS: Record<string, string> = { cash: "#f59e0b", cheque: "#1f2937", upi: ACCENT, neft: "#10b981" };
+    const byMode = new Map<string, number>();
+    for (const r of receipts) byMode.set(r.mode, (byMode.get(r.mode) ?? 0) + r.amount);
+    return Array.from(byMode.entries()).map(([mode, amount]) => ({
+      label: MODE_LABELS[mode] ?? mode,
+      value: Math.round(amount),
+      color: MODE_COLORS[mode] ?? "#94a3b8",
+    }));
+  }, [receipts]);
+
+  const monthlyTrend: MonthPoint[] = useMemo(() => {
+    const byMonth = new Map<string, number>();
+    for (const inv of invoices) {
+      const key = inv.invoice_date.slice(0, 7);
+      byMonth.set(key, (byMonth.get(key) ?? 0) + inv.total);
+    }
+    return Array.from(byMonth.keys())
+      .sort()
+      .slice(-6)
+      .map((key) => ({
+        label: new Date(`${key}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short" }),
+        amount: byMonth.get(key) ?? 0,
+      }));
+  }, [invoices]);
+
+  // Real city names live directly in the address field for this seed data
+  // (e.g. "Mumbai", "Ahmedabad") — grouped as-is, no parsing needed.
+  const cityBreakdown: RankedItem[] = useMemo(() => {
+    const byCity = new Map<string, number>();
+    for (const c of customers) {
+      const city = c.address?.trim() || "Unknown";
+      byCity.set(city, (byCity.get(city) ?? 0) + 1);
+    }
+    return Array.from(byCity.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
   }, [customers]);
+
+  const topCustomersByOutstanding: RankedItem[] = useMemo(() => {
+    const byCustomer = new Map<string, number>();
+    for (const r of openRows) byCustomer.set(r.customerName, (byCustomer.get(r.customerName) ?? 0) + r.outstanding);
+    return Array.from(byCustomer.entries())
+      .map(([label, value]) => ({ label, value: Math.round(value) }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  }, [openRows]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -665,8 +782,20 @@ export default function DashboardPage() {
 
           <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <DonutChart title="Invoices by Status" segments={statusDonut} />
-            <DonutChart title="Customers by Segment" segments={segmentDonut} />
-            <DisputeBreakdownPlaceholder />
+            <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} />
+            <DonutChart title="Collections by Payment Mode" segments={paymentModeDonut} formatValue={formatCurrency} />
+          </div>
+
+          <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <ChartCard title="Monthly Invoiced Trend">
+              <MonthlyTrendChart points={monthlyTrend} />
+            </ChartCard>
+            <ChartCard title="Top 5 Customers by Outstanding">
+              <RankedBarList items={topCustomersByOutstanding} formatValue={formatCurrency} color={ACCENT} />
+            </ChartCard>
+            <ChartCard title="Customers by City">
+              <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#1f2937" />
+            </ChartCard>
           </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-3">
