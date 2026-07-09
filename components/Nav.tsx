@@ -78,9 +78,9 @@ export function Nav({ session }: { session: Session }) {
         ) : (
           <div className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5" style={{ background: HEADER_GRADIENT }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-12 w-auto" />
+            <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-16 w-auto" />
             <div className="mt-2">
-              <AR360Logo className="h-6" />
+              <AR360Logo className="h-9" />
             </div>
             <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">(360° AR management)</p>
           </div>
