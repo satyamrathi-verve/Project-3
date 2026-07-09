@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { hexToRgba } from "@/lib/colors";
 
 export interface Column<T> {
   key: string;
@@ -13,15 +14,6 @@ export interface Column<T> {
    * style. Leave unset for a plain column.
    */
   accentColor?: string;
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  const bigint = parseInt(clean, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /*

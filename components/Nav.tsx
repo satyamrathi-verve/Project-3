@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearSession, type Session } from "@/lib/auth";
+import { RainbowText } from "@/components/RainbowText";
+import { colorForIndex, hexToRgba } from "@/lib/colors";
 
 /*
   Left sidebar. Only "Home" exists to start with — everything else is the roadmap
@@ -30,12 +32,17 @@ export function Nav({ session }: { session: Session }) {
 
   return (
     <nav className="no-print flex h-full w-60 flex-col gap-1 border-r border-slate-200 bg-white p-4">
-      <div className="mb-4 px-2">
+      <div
+        className="-mx-4 -mt-4 mb-4 px-6 pb-4 pt-5"
+        style={{ background: "linear-gradient(135deg, #2a78d61a, #eda1001a, #e349481a, #4a3aa71a)" }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-9 w-auto" />
-        <h1 className="mt-1 text-lg font-bold text-slate-900">AR Manager</h1>
+        <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-12 w-auto" />
+        <h1 className="mt-2 text-lg font-bold">
+          <RainbowText text="AR Manager" />
+        </h1>
       </div>
-      {LINKS.map((l) => {
+      {LINKS.map((l, i) => {
         const active = pathname === l.href;
         if (!l.built) {
           return (
@@ -50,15 +57,17 @@ export function Nav({ session }: { session: Session }) {
             </span>
           );
         }
+        const accent = colorForIndex(i);
         return (
           <Link
             key={l.href}
             href={l.href}
+            style={active ? undefined : { borderLeft: `3px solid ${accent}`, backgroundColor: hexToRgba(accent, 0.05) }}
             className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              active ? "bg-brand text-white" : "text-slate-700 hover:bg-slate-100"
+              active ? "bg-brand text-white" : "hover:brightness-95"
             }`}
           >
-            {l.label}
+            {active ? l.label : <RainbowText text={l.label} />}
           </Link>
         );
       })}

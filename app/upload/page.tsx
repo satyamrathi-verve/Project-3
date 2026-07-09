@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { parseCsv } from "@/lib/csv";
+import { colorForIndex } from "@/lib/colors";
 import type { InvoiceStatus } from "@/lib/types";
 
 type UploadType = "customers" | "invoices";
@@ -18,16 +19,8 @@ interface FieldDef {
   date?: boolean;
   /** Numeric fields only: value must be <= 0 (e.g. TDS, a deduction). */
   nonPositive?: boolean;
-}
-
-// Fixed CVD-safe categorical order (validated palette) — cycled across columns
-// so a wide, horizontally-scrolled table stays trackable column-by-column,
-// Rainbow-CSV style. Never used for the Status column (that keeps its own
-// reserved green/red meaning).
-const COLUMN_COLORS = ["#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"];
-
-function columnColor(index: number): string {
-  return COLUMN_COLORS[index % COLUMN_COLORS.length];
+  /** Numeric fields only: value must be >= 0 (e.g. Credit Period, a day count). */
+  nonNegative?: boolean;
 }
 
 const CUSTOMER_FIELDS: FieldDef[] = [
@@ -49,7 +42,10 @@ const INVOICE_FIELDS: FieldDef[] = [
   { key: "ref_no", label: "Ref No" },
   { key: "invoice_date", label: "Invoice Date", required: true, date: true },
   { key: "customer_code", label: "Customer Code", required: true },
-  { key: "due_date", label: "Due Date (optional)", date: true },
+  // Days of credit for this invoice — overrides the customer's default credit_days
+  // when set. Due Date (fed straight into the AR Ageing report's bucketing) is
+  // always derived from this, never typed directly, so the two screens can't disagree.
+  { key: "credit_period", label: "Credit Period", numeric: true, nonNegative: true },
   { key: "description", label: "Description", required: true },
   { key: "qty", label: "Qty", required: true, numeric: true },
   { key: "rate", label: "Rate", required: true, numeric: true },
@@ -106,10 +102,11 @@ const SAMPLE_CUSTOMER_ROWS: Record<string, string>[] = [
   },
 ];
 
-// customer_name and taxable_value are shown here purely for reference — they mirror
-// the two computed/looked-up columns in the preview table (customer_name comes from
-// customer_code, taxable_value = qty*rate). Neither is a real input field, so both are
-// ignored if this same file is re-uploaded.
+// customer_name, due_date, and taxable_value are shown here purely for reference —
+// they mirror the three computed/looked-up columns in the preview table
+// (customer_name from customer_code; due_date from invoice_date + credit_period,
+// or the customer's default credit_days if left blank; taxable_value = qty*rate).
+// None are real input fields, so all three are ignored if this file is re-uploaded.
 const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
   {
     invoice_no: "INV-9001",
@@ -117,7 +114,8 @@ const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
     invoice_date: "2026-06-01",
     customer_code: "CUST001",
     customer_name: "Sterling Textiles Pvt Ltd",
-    due_date: "",
+    credit_period: "",
+    due_date: "2026-07-01",
     description: "Cotton yarn - bulk order",
     qty: "100",
     rate: "450",
@@ -134,6 +132,7 @@ const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
     invoice_date: "2026-06-05",
     customer_code: "CUST002",
     customer_name: "Greenleaf Organics LLP",
+    credit_period: "15",
     due_date: "2026-06-20",
     description: "Organic packaging supplies",
     qty: "50",
@@ -151,6 +150,7 @@ const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
     invoice_date: "2026-06-10",
     customer_code: "CUST999",
     customer_name: "",
+    credit_period: "",
     due_date: "",
     description: "Custom order",
     qty: "20",
@@ -168,7 +168,8 @@ const SAMPLE_INVOICE_ROWS: Record<string, string>[] = [
     invoice_date: "2026-06-12",
     customer_code: "CUST003",
     customer_name: "Nimbus Software Solutions",
-    due_date: "",
+    credit_period: "",
+    due_date: "2026-07-27",
     description: "Software support retainer",
     qty: "",
     rate: "5000",
@@ -190,6 +191,7 @@ const INVOICE_SAMPLE_COLUMNS = [
   "invoice_date",
   "customer_code",
   "customer_name",
+  "credit_period",
   "due_date",
   "description",
   "qty",
@@ -266,6 +268,10 @@ function rowErrors(type: UploadType, values: Record<string, string>, customersBy
       errors[f.key] = "Must be zero or negative (it's a deduction)";
       continue;
     }
+    if (f.nonNegative && Number(val) < 0) {
+      errors[f.key] = "Must be zero or positive (it's a day count)";
+      continue;
+    }
     if (f.date && Number.isNaN(Date.parse(val))) {
       errors[f.key] = "Invalid date";
       continue;
@@ -287,6 +293,19 @@ function taxableValue(v: Record<string, string>): number {
   const qty = Number(v.qty) || 0;
   const rate = Number(v.rate) || 0;
   return qty * rate;
+}
+
+// The date that actually lands in invoices.due_date, and the only thing the AR
+// Ageing report reads to bucket a balance — so this preview column always
+// mirrors what will get synced, before you even insert.
+function resolvedDueDate(v: Record<string, string>, customer: CustomerLookup | undefined): string | null {
+  const invoiceDate = v.invoice_date.trim();
+  if (!invoiceDate || Number.isNaN(Date.parse(invoiceDate))) return null;
+  const creditPeriodStr = v.credit_period.trim();
+  const days =
+    creditPeriodStr !== "" && !Number.isNaN(Number(creditPeriodStr)) ? Number(creditPeriodStr) : customer?.credit_days;
+  if (days === undefined) return null;
+  return addDays(invoiceDate, days);
 }
 
 function money(n: number): string {
@@ -408,7 +427,9 @@ export default function UploadPage() {
         const taxAmount = (Number(v.igst) || 0) + (Number(v.cgst) || 0) + (Number(v.sgst) || 0);
         const tds = Number(v.tds) || 0; // always <= 0 by validation — a deduction before payment
         const total = subtotal + taxAmount + tds;
-        const dueDate = v.due_date.trim() || addDays(v.invoice_date.trim(), customer.credit_days);
+        const creditPeriodStr = v.credit_period.trim();
+        const creditDays = creditPeriodStr !== "" ? Number(creditPeriodStr) : customer.credit_days;
+        const dueDate = addDays(v.invoice_date.trim(), creditDays);
         const today = new Date().toISOString().slice(0, 10);
         const status: InvoiceStatus = dueDate < today ? "overdue" : "open";
         // invoices has no dedicated ref_no/TDS column, so fold both into the narration
@@ -472,7 +493,7 @@ export default function UploadPage() {
       key: f.key,
       header: f.label,
       className: f.numeric ? "text-right" : undefined,
-      accentColor: columnColor(colorIndex),
+      accentColor: colorForIndex(colorIndex),
       render: (row: Row) => {
         const errors = rowErrors(type, row.values, customersByCode);
         const hasError = Boolean(errors[f.key]);
@@ -519,7 +540,7 @@ export default function UploadPage() {
           {
             key: "__customer_name",
             header: "Customer Name",
-            accentColor: columnColor(4),
+            accentColor: colorForIndex(4),
             render: (row: Row) => {
               const customer = customersByCode.get(row.values.customer_code.trim());
               return customer ? (
@@ -529,26 +550,40 @@ export default function UploadPage() {
               );
             },
           },
-          editableColumn(invoiceField("due_date"), 5),
-          editableColumn(invoiceField("description"), 6),
-          editableColumn(invoiceField("qty"), 7),
-          editableColumn(invoiceField("rate"), 0),
+          editableColumn(invoiceField("credit_period"), 5),
+          {
+            key: "__due_date",
+            header: "Due Date",
+            accentColor: colorForIndex(6),
+            render: (row: Row) => {
+              const customer = customersByCode.get(row.values.customer_code.trim());
+              const due = resolvedDueDate(row.values, customer);
+              return due ? (
+                <span className="whitespace-nowrap text-xs text-slate-600">{due}</span>
+              ) : (
+                <span className="text-xs italic text-slate-300">—</span>
+              );
+            },
+          },
+          editableColumn(invoiceField("description"), 7),
+          editableColumn(invoiceField("qty"), 0),
+          editableColumn(invoiceField("rate"), 1),
           {
             key: "__taxable_value",
             header: "Taxable Value-Qty*Rate",
             className: "text-right",
-            accentColor: columnColor(1),
+            accentColor: colorForIndex(2),
             render: (row: Row) => (
               <span className="whitespace-nowrap text-xs font-medium tabular-nums text-slate-700">
                 {money(taxableValue(row.values))}
               </span>
             ),
           },
-          editableColumn(invoiceField("igst"), 2),
-          editableColumn(invoiceField("cgst"), 3),
-          editableColumn(invoiceField("sgst"), 4),
-          editableColumn(invoiceField("tds"), 5),
-          editableColumn(invoiceField("narration"), 6),
+          editableColumn(invoiceField("igst"), 3),
+          editableColumn(invoiceField("cgst"), 4),
+          editableColumn(invoiceField("sgst"), 5),
+          editableColumn(invoiceField("tds"), 6),
+          editableColumn(invoiceField("narration"), 7),
           statusColumn,
         ];
 
