@@ -53,6 +53,21 @@ export interface GLAccount {
   created_at?: string;
 }
 
+/* Added by supabase/migration_gl_journal.sql — one row per debit/credit line.
+   A posting (one invoice or receipt) is 2-3 rows sharing reference_type +
+   reference_id whose debits and credits net to zero. */
+export interface GLJournalEntry {
+  id: string;
+  entry_date: string;
+  reference_type: "invoice" | "receipt" | "opening_balance";
+  reference_id: string;
+  gl_account_id: string;
+  debit: number;
+  credit: number;
+  description: string | null;
+  created_at: string;
+}
+
 export type InvoiceStatus = "open" | "partial" | "paid" | "overdue";
 
 export interface Invoice {

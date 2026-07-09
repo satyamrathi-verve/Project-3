@@ -6,6 +6,7 @@ import { supabase, isConfigured } from "@/lib/supabase";
 import { FormField, inputClass } from "@/components/FormField";
 import { NotConfigured } from "@/components/NotConfigured";
 import type { Customer, Invoice, InvoiceItem } from "@/lib/types";
+import { postInvoiceJournal, reverseJournalFor } from "@/lib/glPosting";
 
 interface LineItem {
   description: string;
@@ -285,6 +286,21 @@ export function InvoiceForm({ invoiceId }: { invoiceId?: string }) {
         }))
       );
       if (itemsErr) throw itemsErr;
+
+      // GL posting: Debtors (Dr) vs Revenue + GST Payable (Cr). On an edit the
+      // totals may have changed, so the old posting is reversed before the new
+      // one goes in, rather than trying to patch individual lines.
+      if (id) {
+        if (isEdit) await reverseJournalFor("invoice", id);
+        await postInvoiceJournal({
+          id,
+          invoice_no: invoiceNo.trim(),
+          invoice_date: invoiceDate,
+          subtotal,
+          tax_amount: taxAmount,
+          total,
+        });
+      }
 
       setSavedId(id ?? null);
       setSuccess(isEdit ? "Invoice updated." : `Invoice ${invoiceNo} created.`);

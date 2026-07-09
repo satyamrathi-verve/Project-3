@@ -21,6 +21,7 @@ import { InvoiceAllocationGrid, type InvoiceRow } from "@/components/receipts/In
 import { AccountingPreview } from "@/components/receipts/AccountingPreview";
 import { ReceiptSummaryPanel } from "@/components/receipts/ReceiptSummaryPanel";
 import { ModeBadge } from "@/components/receipts/ModeBadge";
+import { postReceiptJournal, reverseJournalFor } from "@/lib/glPosting";
 
 type ReceiptRow = Receipt & {
   customer_name: string;
@@ -426,6 +427,17 @@ export default function ReceiptEntryPage() {
 
     await Promise.all([...affectedInvoiceIds].map((id) => recomputeInvoiceStatus(id)));
 
+    // GL posting: Cash/Bank (Dr) vs Debtors (Cr) — the exact pair the
+    // Accounting Preview above already documents, now actually posted.
+    if (editingId) await reverseJournalFor("receipt", editingId);
+    await postReceiptJournal({
+      id: receiptId as string,
+      receipt_no: payload.receipt_no,
+      receipt_date: payload.receipt_date,
+      amount: payload.amount,
+      mode: payload.mode,
+    });
+
     clearDraft();
     setSaving(false);
     toast.show("success", editingId ? `Receipt ${payload.receipt_no} updated.` : `Receipt ${payload.receipt_no} saved.`);
@@ -451,6 +463,7 @@ export default function ReceiptEntryPage() {
       return;
     }
 
+    await reverseJournalFor("receipt", row.id);
     await Promise.all(affectedIds.map((id) => recomputeInvoiceStatus(id)));
     toast.show("success", `Receipt ${row.receipt_no} deleted.`);
     await loadReceipts();
