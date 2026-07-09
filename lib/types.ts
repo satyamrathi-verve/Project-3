@@ -10,6 +10,13 @@ export interface Company {
   gstin: string | null;
   email: string | null;
   phone: string | null;
+  pan: string | null;
+  logo_url: string | null;
+  bank_account_no: string | null;
+  bank_name: string | null;
+  bank_ifsc: string | null;
+  bank_branch: string | null;
+  terms_conditions: string | null;
 }
 
 export interface Customer {
@@ -50,6 +57,21 @@ export interface Invoice {
   status: InvoiceStatus;
   notes: string | null;
   created_at: string;
+  place_of_supply: string | null;
+  reverse_charge: boolean;
+  transporter_name: string | null;
+  vehicle_no: string | null;
+  transporter_doc_no: string | null;
+  transporter_doc_date: string | null;
+  eway_bill_no: string | null;
+  eway_bill_date: string | null;
+  irn: string | null;
+  ack_no: string | null;
+  ack_date: string | null;
+  shipping_name: string | null;
+  shipping_gstin: string | null;
+  shipping_address: string | null;
+  discount_total: number;
 }
 
 export interface InvoiceItem {
@@ -59,6 +81,10 @@ export interface InvoiceItem {
   qty: number;
   rate: number;
   amount: number;
+  hsn_sac: string | null;
+  unit: string | null;
+  discount: number;
+  tax_rate: number;
 }
 
 export type ReceiptMode = "cash" | "cheque" | "upi" | "neft";
