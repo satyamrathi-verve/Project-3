@@ -54,6 +54,7 @@ interface HistoryRow {
   invoice_no: string;
   to_email: string | null;
   subject: string;
+  body: string;
   status: string;
 }
 
@@ -210,6 +211,7 @@ export default function AutoEmailShootPage() {
   const [historyRows, setHistoryRows] = useState<HistoryRow[]>([]);
   const [historyCustomerFilter, setHistoryCustomerFilter] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -342,7 +344,7 @@ export default function AutoEmailShootPage() {
     setHistoryLoading(true);
     const { data } = await supabase
       .from("reminder_log")
-      .select("id, to_email, subject, status, sent_at, invoices(invoice_no, customers(name))")
+      .select("id, to_email, subject, body, status, sent_at, invoices(invoice_no, customers(name))")
       .order("sent_at", { ascending: false })
       .limit(200);
     setHistoryRows(
@@ -353,6 +355,7 @@ export default function AutoEmailShootPage() {
         invoice_no: r.invoices?.invoice_no ?? "Unknown invoice",
         to_email: r.to_email,
         subject: r.subject,
+        body: r.body ?? "",
         status: r.status,
       }))
     );
@@ -662,37 +665,66 @@ export default function AutoEmailShootPage() {
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Email</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Subject</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Status</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-600 dark:text-slate-300">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleHistoryRows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center text-slate-400 dark:text-slate-600">
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400 dark:text-slate-600">
                       {historyCustomerFilter ? "Nothing sent to this customer yet." : "Nothing sent yet."}
                     </td>
                   </tr>
                 ) : (
-                  visibleHistoryRows.map((r) => (
-                    <tr
-                      key={r.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-cream-dim dark:border-slate-800 dark:hover:bg-slate-800"
-                    >
-                      <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
-                        {new Date(r.sent_at).toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
-                        {r.customer_name}
-                      </td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.invoice_no}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.to_email ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.subject}</td>
-                      <td className="px-4 py-3">
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                          {r.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                  visibleHistoryRows.map((r) => {
+                    const expanded = expandedHistoryId === r.id;
+                    return (
+                      <Fragment key={r.id}>
+                        <tr className="border-b border-slate-100 last:border-0 hover:bg-cream-dim dark:border-slate-800 dark:hover:bg-slate-800">
+                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                            {new Date(r.sent_at).toLocaleString("en-IN")}
+                          </td>
+                          <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">
+                            {r.customer_name}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.invoice_no}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.to_email ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{r.subject}</td>
+                          <td className="px-4 py-3">
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                              {r.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              title="View email"
+                              onClick={() => setExpandedHistoryId(expanded ? null : r.id)}
+                              className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand dark:text-slate-400 dark:hover:bg-slate-700"
+                            >
+                              <EyeIcon />
+                            </button>
+                          </td>
+                        </tr>
+                        {expanded && (
+                          <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <td colSpan={7} className="bg-cream-dim px-4 py-4 dark:bg-slate-800">
+                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                Subject
+                              </p>
+                              <p className="mb-3 font-medium text-slate-800 dark:text-slate-100">{r.subject}</p>
+                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                                Body
+                              </p>
+                              <div className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-cream p-3 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                                {r.body || "—"}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>
