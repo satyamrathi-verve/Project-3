@@ -126,25 +126,23 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
         </button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-8 text-sm print:rounded-none print:border-0 print:p-0 print:text-xs">
+      <div className="rounded-xl border-t-4 border-brand border-x border-b border-slate-200 bg-white p-8 text-sm print:rounded-none print:border-x-0 print:border-b-0 print:p-0 print:text-xs">
         <div className="flex justify-between text-xs text-slate-500">
           <span>Page No. 1 of 1</span>
           <span className="font-medium">Original Copy</span>
         </div>
-        <h1 className="mt-2 text-center text-lg font-bold uppercase tracking-wide text-slate-900">Tax Invoice</h1>
+        <h1 className="mt-2 text-center text-lg font-bold uppercase tracking-wide text-brand">Tax Invoice</h1>
 
         <div className="mt-4 flex items-start justify-between gap-6 border-t border-b border-slate-200 py-4">
           <div className="flex gap-4">
-            {company?.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={company.logo_url} alt="" className="h-14 w-14 rounded object-contain" />
-            ) : (
-              <div className="flex h-14 w-14 flex-none items-center justify-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">
-                Logo
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={company?.logo_url || "/brand/verve-logo.png"}
+              alt={company?.name ?? "Company logo"}
+              className="h-14 w-auto flex-none object-contain"
+            />
             <div>
-              <h2 className="text-base font-bold text-slate-900">{company?.name ?? "Add Company Name"}</h2>
+              <h2 className="text-base font-bold text-brand">{company?.name ?? "Add Company Name"}</h2>
               <p className="mt-0.5 whitespace-pre-line text-slate-500">{company?.address ?? "Add Address"}</p>
               <p className="mt-0.5 text-slate-500">
                 {company?.phone ? `Mobile: ${company.phone}` : "Mobile: —"}
@@ -176,7 +174,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
         </div>
 
         <div className="mt-4 rounded-lg border border-slate-200 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Transporter Details</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand">Transporter Details</p>
           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600 sm:grid-cols-3">
             <p>Transporter: <span className="text-slate-900">{invoice.transporter_name ?? "—"}</span></p>
             <p>Vehicle No.: <span className="text-slate-900">{invoice.vehicle_no ?? "—"}</span></p>
@@ -189,7 +187,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Billing Details</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Billing Details</p>
             <p className="mt-1 font-semibold text-slate-900">{customer?.name ?? "—"}</p>
             <p className="text-slate-600">
               GSTIN: {customer?.gstin ?? "—"} | Mobile: {customer?.phone ?? "—"} | Email: {customer?.email ?? "—"}
@@ -197,7 +195,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
             <p className="whitespace-pre-line text-slate-600">{customer?.address ?? "—"}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Shipping Details</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Shipping Details</p>
             <p className="mt-1 font-semibold text-slate-900">{shippingName ?? "—"}</p>
             <p className="text-slate-600">GSTIN: {shippingGstin ?? "—"}</p>
             <p className="whitespace-pre-line text-slate-600">{shippingAddress ?? "—"}</p>
@@ -213,7 +211,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
 
         <table className="mt-6 w-full text-left">
           <thead>
-            <tr className="border-y border-slate-300 text-slate-600">
+            <tr className="border-y-2 border-brand bg-brand/5 text-brand-dark">
               <th className="py-2 pr-2 font-semibold">Sr.</th>
               <th className="py-2 pr-2 font-semibold">Item Description</th>
               <th className="py-2 pr-2 font-semibold">HSN/SAC</th>
@@ -250,7 +248,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
                 <span>- {money(Number(invoice.discount_total))}</span>
               </div>
             )}
-            <div className="flex justify-between border-t border-slate-300 pt-1 text-base font-semibold text-slate-900">
+            <div className="flex justify-between border-t-2 border-brand pt-1 text-base font-bold text-accent-dark">
               <span>Total</span>
               <span>{money(Number(invoice.total))}</span>
             </div>
@@ -271,7 +269,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
 
         <div className="mt-6 grid grid-cols-1 gap-6 border-t border-slate-200 pt-4 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Terms and Conditions</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Terms and Conditions</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-4 text-slate-600">
               {(terms.length ? terms : ["E & OE"]).map((t, i) => (
                 <li key={i}>{t}</li>
@@ -292,7 +290,7 @@ export function InvoicePrint({ invoiceId }: { invoiceId: string }) {
 
         <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bank Details</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-brand">Bank Details</p>
             <p className="mt-1 text-slate-600">Account Number: {company?.bank_account_no ?? "—"}</p>
             <p className="text-slate-600">Bank: {company?.bank_name ?? "—"}</p>
             <p className="text-slate-600">IFSC: {company?.bank_ifsc ?? "—"}</p>

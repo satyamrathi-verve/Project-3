@@ -102,25 +102,23 @@ export function ReceiptPrint({ receiptId }: { receiptId: string }) {
         </button>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-cream p-8 text-sm print:rounded-none print:border-0 print:p-0">
+      <div className="rounded-xl border-t-4 border-brand border-x border-b border-slate-200 bg-cream p-8 text-sm print:rounded-none print:border-x-0 print:border-b-0 print:p-0">
         <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-4">
           <div className="flex gap-4">
-            {company?.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={company.logo_url} alt="" className="h-14 w-14 rounded object-contain" />
-            ) : (
-              <div className="flex h-14 w-14 flex-none items-center justify-center rounded border border-dashed border-slate-300 text-[10px] text-slate-400">
-                Logo
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={company?.logo_url || "/brand/verve-logo.png"}
+              alt={company?.name ?? "Company logo"}
+              className="h-14 w-auto flex-none object-contain"
+            />
             <div>
-              <h2 className="text-base font-bold text-slate-900">{company?.name ?? "Verve Advisory Pvt Ltd"}</h2>
+              <h2 className="text-base font-bold text-brand">{company?.name ?? "Verve Advisory Pvt Ltd"}</h2>
               <p className="mt-0.5 whitespace-pre-line text-slate-500">{company?.address ?? ""}</p>
               <p className="mt-0.5 text-slate-500">{company?.gstin ? `GSTIN: ${company.gstin}` : ""}</p>
             </div>
           </div>
           <div className="flex-none text-right">
-            <h1 className="text-lg font-bold uppercase tracking-wide text-slate-900">Payment Receipt</h1>
+            <h1 className="text-lg font-bold uppercase tracking-wide text-brand">Payment Receipt</h1>
             <p className="mt-2">
               Receipt No: <span className="font-semibold text-slate-900">{receipt.receipt_no}</span>
             </p>
@@ -131,7 +129,7 @@ export function ReceiptPrint({ receiptId }: { receiptId: string }) {
         </div>
 
         <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Received From</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand">Received From</p>
           <p className="mt-1 font-semibold text-slate-900">{customer?.name ?? "—"}</p>
           <p className="text-slate-600">{customer?.address ?? ""}</p>
           <p className="text-slate-600">{customer?.gstin ? `GSTIN: ${customer.gstin}` : ""}</p>
@@ -141,7 +139,7 @@ export function ReceiptPrint({ receiptId }: { receiptId: string }) {
           <p>
             Amount Received
             <br />
-            <span className="text-base font-bold text-slate-900">₹{money(Number(receipt.amount))}</span>
+            <span className="text-base font-bold text-accent-dark">₹{money(Number(receipt.amount))}</span>
           </p>
           <p>
             Mode
@@ -158,13 +156,13 @@ export function ReceiptPrint({ receiptId }: { receiptId: string }) {
         <p className="mt-3 text-slate-700">Amount in words: {rupeesInWords(Number(receipt.amount))}</p>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Applied Against</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand">Applied Against</p>
           {allocations.length === 0 ? (
             <p className="mt-2 text-slate-500">Not yet allocated to any invoice — held on account.</p>
           ) : (
             <table className="mt-2 w-full text-left">
               <thead>
-                <tr className="border-y border-slate-300 text-slate-600">
+                <tr className="border-y-2 border-brand bg-brand/5 text-brand-dark">
                   <th className="py-2 pr-2 font-semibold">Invoice #</th>
                   <th className="py-2 pr-2 font-semibold">Invoice Date</th>
                   <th className="py-2 pl-2 text-right font-semibold">Amount Applied (₹)</th>
