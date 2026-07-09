@@ -1,50 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { supabase, isConfigured } from "@/lib/supabase";
 import type { Invoice, InvoiceStatus } from "@/lib/types";
 import { DataTable, type Column } from "@/components/DataTable";
 import { PageHeader } from "@/components/PageHeader";
 import { NotConfigured } from "@/components/NotConfigured";
 import { avatarColor } from "@/lib/avatarColor";
+import { money, formatDate } from "@/lib/format";
+import { overdueDays, effectiveStatus, STATUS_LABEL } from "@/lib/invoiceStatus";
 
 /* What we get back from Supabase once the customers(name) join resolves. */
 type InvoiceRow = Invoice & { customers: { name: string } | null };
-
-const money = (n: number) => `₹${Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-
-const MS_PER_DAY = 86_400_000;
-
-/* Whole days past due, compared date-only (not time-of-day) so it doesn't flicker
-   depending on what hour you load the page. 0 if paid or not yet due. */
-function overdueDays(inv: Invoice): number {
-  if (inv.status === "paid") return 0;
-  const due = new Date(inv.due_date);
-  const today = new Date();
-  const diff = Math.floor(
-    (Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()) -
-      Date.UTC(due.getFullYear(), due.getMonth(), due.getDate())) /
-      MS_PER_DAY,
-  );
-  return diff > 0 ? diff : 0;
-}
-
-/* The stored status is set once when an invoice is created and never revisited,
-   so it goes stale: an open/partial invoice whose due date has since passed is
-   overdue regardless of what the status column still says. Compute it instead. */
-function effectiveStatus(inv: Invoice): InvoiceStatus {
-  if (inv.status === "paid") return "paid";
-  return overdueDays(inv) > 0 ? "overdue" : inv.status;
-}
-
-const STATUS_LABEL: Record<InvoiceStatus, string> = {
-  open: "Open",
-  paid: "Paid",
-  overdue: "Overdue",
-  partial: "Partial",
-};
 
 const STATUS_CHIP_ACTIVE: Record<InvoiceStatus, string> = {
   open: "bg-sky-600 text-white",
@@ -139,9 +107,12 @@ export default function InvoiceListPage() {
       key: "invoice_no",
       header: "Invoice Number",
       render: (i) => (
-        <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-600">
+        <Link
+          href={`/invoices/${i.id}`}
+          className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-brand hover:underline"
+        >
           {i.invoice_no}
-        </span>
+        </Link>
       ),
     },
     { key: "invoice_date", header: "Invoice Date", render: (i) => formatDate(i.invoice_date) },
