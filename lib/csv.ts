@@ -34,6 +34,26 @@ function splitCsvLine(line: string): string[] {
   return out.map((s) => s.trim());
 }
 
+/** Turns rows of plain values into a downloadable CSV (also opens cleanly in Excel). */
+export function toCsv(headers: string[], rows: (string | number)[][]): string {
+  const escape = (v: string | number) => {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers.map(escape).join(","), ...rows.map((r) => r.map(escape).join(","))].join("\r\n");
+}
+
+export function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]) {
+  const csv = "﻿" + toCsv(headers, rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
