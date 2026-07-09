@@ -595,6 +595,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  const [dashTab, setDashTab] = useState<"overview" | "insights">("overview");
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [daysFilter, setDaysFilter] = useState<DaysFilter>("all");
@@ -1015,201 +1016,241 @@ export default function DashboardPage() {
 
       {isConfigured && !loading && !error && (
         <>
-          <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 ${revealClass(mounted)}`}>
-            <StatCard
-              label="Total AR Outstanding"
-              value={stats.totalAR}
-              format={formatFullCurrency}
-              icon={<IndianRupee className="h-4 w-4" />}
-              active={mounted}
-            />
-            <StatCard
-              label="Days Sales Outstanding"
-              value={stats.dso}
-              format={(n) => `${n.toFixed(0)} days`}
-              hint={stats.dso <= 45 ? "Within standard (≤45)" : "Above standard (45)"}
-              tone={stats.dso > 45 ? "danger" : "success"}
-              icon={<Clock className="h-4 w-4" />}
-              active={mounted}
-            />
-            <StatCard
-              label="Total Past Due"
-              value={stats.totalPastDue}
-              format={formatFullCurrency}
-              tone={stats.totalPastDue > 0 ? "danger" : "default"}
-              icon={<AlertTriangle className="h-4 w-4" />}
-              active={mounted}
-            />
-            <StatCard
-              label="Collection Effectiveness"
-              value={stats.cei}
-              format={(n) => `${n.toFixed(1)}%`}
-              tone="success"
-              icon={<Percent className="h-4 w-4" />}
-              active={mounted}
-            />
-            <StatCard
-              label="Open Invoices"
-              value={stats.openCount}
-              format={(n) => String(Math.round(n))}
-              icon={<TrendingUp className="h-4 w-4" />}
-              active={mounted}
-            />
+          <div className={`mb-6 inline-flex rounded-full bg-white p-1 text-sm font-semibold shadow-sm ${revealClass(mounted)}`}>
+            {(
+              [
+                { key: "overview", label: "Overview" },
+                { key: "insights", label: "Insights" },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={dashTab === t.key}
+                onClick={() => setDashTab(t.key)}
+                className="rounded-full px-4 py-2 transition-colors"
+                style={
+                  dashTab === t.key ? { backgroundColor: ACCENT, color: "white" } : { color: "#64748b" }
+                }
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          <div
-            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "80ms" }}
-          >
-            <AgeingBarChart buckets={ageingBuckets} animate={mounted} />
-            <CashForecastChart points={cashForecast} animate={mounted} />
-          </div>
+          {dashTab === "overview" && (
+            <>
+              <div className={`mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 ${revealClass(mounted)}`}>
+                <StatCard
+                  label="Total AR Outstanding"
+                  value={stats.totalAR}
+                  format={formatFullCurrency}
+                  icon={<IndianRupee className="h-4 w-4" />}
+                  active={mounted}
+                />
+                <StatCard
+                  label="Days Sales Outstanding"
+                  value={stats.dso}
+                  format={(n) => `${n.toFixed(0)} days`}
+                  hint={stats.dso <= 45 ? "Within standard (≤45)" : "Above standard (45)"}
+                  tone={stats.dso > 45 ? "danger" : "success"}
+                  icon={<Clock className="h-4 w-4" />}
+                  active={mounted}
+                />
+                <StatCard
+                  label="Total Past Due"
+                  value={stats.totalPastDue}
+                  format={formatFullCurrency}
+                  tone={stats.totalPastDue > 0 ? "danger" : "default"}
+                  icon={<AlertTriangle className="h-4 w-4" />}
+                  active={mounted}
+                />
+                <StatCard
+                  label="Collection Effectiveness"
+                  value={stats.cei}
+                  format={(n) => `${n.toFixed(1)}%`}
+                  tone="success"
+                  icon={<Percent className="h-4 w-4" />}
+                  active={mounted}
+                />
+                <StatCard
+                  label="Open Invoices"
+                  value={stats.openCount}
+                  format={(n) => String(Math.round(n))}
+                  icon={<TrendingUp className="h-4 w-4" />}
+                  active={mounted}
+                />
+              </div>
 
-          <div
-            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "160ms" }}
-          >
-            <DonutChart title="Invoices by Status" segments={statusDonut} animate={mounted} />
-            <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} animate={mounted} />
-            <DonutChart title="Collections by Payment Mode" segments={paymentModeDonut} formatValue={formatCurrency} animate={mounted} />
-          </div>
+              <div
+                className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}
+                style={{ transitionDelay: "80ms" }}
+              >
+                <AgeingBarChart buckets={ageingBuckets} animate={mounted} />
+                <ChartCard title="AR Outstanding Trend (month-end balance)">
+                  <AreaTrendChart points={arOutstandingTrend} animate={mounted} />
+                </ChartCard>
+              </div>
 
-          <div
-            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "220ms" }}
-          >
-            <ChartCard title="AR Outstanding Trend (month-end balance)">
-              <AreaTrendChart points={arOutstandingTrend} animate={mounted} />
-            </ChartCard>
-            <ChartCard title="Monthly Invoiced Trend">
-              <MonthlyTrendChart points={monthlyTrend} animate={mounted} />
-            </ChartCard>
-          </div>
+              {uncontactedOverdueCount > 0 && (
+                <div
+                  className={`mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${revealClass(
+                    mounted
+                  )}`}
+                  style={{ transitionDelay: "160ms" }}
+                >
+                  <AlertTriangle className="h-4 w-4 flex-none" />
+                  <span>
+                    <strong>{uncontactedOverdueCount}</strong> of {overdueCount} overdue invoices have never received a
+                    reminder — these need outreach first.
+                  </span>
+                </div>
+              )}
 
-          <div
-            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "280ms" }}
-          >
-            <div className="lg:col-span-2">
-              <ChartCard title="Credit Limit vs Net Receivable — Top 5">
-                <CreditUtilizationChart rows={creditVsReceivable} animate={mounted} />
-              </ChartCard>
-            </div>
-            <ChartCard title="Customers by City">
-              <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#64748b" animate={mounted} />
-            </ChartCard>
-          </div>
+              <div
+                className={`mb-4 flex flex-wrap items-center gap-3 ${revealClass(mounted)}`}
+                style={{ transitionDelay: "220ms" }}
+              >
+                <div className="relative min-w-[200px] flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search customer name…"
+                    className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2"
+                    style={{ ["--tw-ring-color" as string]: `${ACCENT}55` }}
+                  />
+                </div>
+                <select
+                  value={riskFilter}
+                  onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+                >
+                  <option value="all">All risk tiers</option>
+                  <option value="High">High risk</option>
+                  <option value="Medium">Medium risk</option>
+                  <option value="Low">Low risk</option>
+                </select>
+                <select
+                  value={daysFilter}
+                  onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+                >
+                  <option value="all">Any days past due</option>
+                  <option value="1-30">1–30 days</option>
+                  <option value="31-60">31–60 days</option>
+                  <option value="61-90">61–90 days</option>
+                  <option value="91+">91+ days</option>
+                </select>
+                <select
+                  value={segmentFilter}
+                  onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
+                  title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
+                >
+                  <option value="all">All segments</option>
+                  <option value="Enterprise">Enterprise</option>
+                  <option value="SMB">SMB</option>
+                </select>
+              </div>
 
-          {uncontactedOverdueCount > 0 && (
-            <div
-              className={`mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${revealClass(
-                mounted
-              )}`}
-              style={{ transitionDelay: "340ms" }}
-            >
-              <AlertTriangle className="h-4 w-4 flex-none" />
-              <span>
-                <strong>{uncontactedOverdueCount}</strong> of {overdueCount} overdue invoices have never received a
-                reminder — these need outreach first.
-              </span>
-            </div>
+              <div
+                className={`overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm ${revealClass(mounted)}`}
+                style={{ transitionDelay: "280ms" }}
+              >
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left">
+                      <th className="w-6 px-2 py-3" />
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Customer</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Invoice #</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">
+                        Amount Owed
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">
+                        Days Past Due
+                      </th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Risk Tier</th>
+                      <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">
+                        Last Touchpoint
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                          No invoices match your filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRows.map((row) => (
+                        <tr
+                          key={row.id}
+                          onClick={() => setSelectedInvoiceId(row.id)}
+                          className="cursor-pointer border-b border-slate-100 transition-colors duration-150 last:border-0 hover:bg-slate-50"
+                        >
+                          <td className="px-2 py-3">{row.isAlert && <AlertDot />}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.customerName}</td>
+                          <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
+                          <td className="px-4 py-3 text-right font-bold text-slate-900">
+                            {formatFullCurrency(row.outstanding)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${RISK_STYLES[row.riskTier]}`}>
+                              {row.riskTier}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">{row.lastTouchpoint ?? "No contact yet"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-slate-400">Click any row to draft and send a collection reminder.</p>
+            </>
           )}
 
-          <div
-            className={`mb-4 flex flex-wrap items-center gap-3 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "360ms" }}
-          >
-            <div className="relative min-w-[200px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search customer name…"
-                className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm shadow-sm outline-none focus:ring-2"
-                style={{ ["--tw-ring-color" as string]: `${ACCENT}55` }}
-              />
-            </div>
-            <select
-              value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
-            >
-              <option value="all">All risk tiers</option>
-              <option value="High">High risk</option>
-              <option value="Medium">Medium risk</option>
-              <option value="Low">Low risk</option>
-            </select>
-            <select
-              value={daysFilter}
-              onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
-            >
-              <option value="all">Any days past due</option>
-              <option value="1-30">1–30 days</option>
-              <option value="31-60">31–60 days</option>
-              <option value="61-90">61–90 days</option>
-              <option value="91+">91+ days</option>
-            </select>
-            <select
-              value={segmentFilter}
-              onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none"
-              title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
-            >
-              <option value="all">All segments</option>
-              <option value="Enterprise">Enterprise</option>
-              <option value="SMB">SMB</option>
-            </select>
-          </div>
+          {dashTab === "insights" && (
+            <>
+              <div className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}>
+                <CashForecastChart points={cashForecast} animate={mounted} />
+                <ChartCard title="Monthly Invoiced Trend">
+                  <MonthlyTrendChart points={monthlyTrend} animate={mounted} />
+                </ChartCard>
+              </div>
 
-          <div
-            className={`overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm ${revealClass(mounted)}`}
-            style={{ transitionDelay: "380ms" }}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 text-left">
-                  <th className="w-6 px-2 py-3" />
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Customer</th>
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Invoice #</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">Amount Owed</th>
-                  <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-800">Days Past Due</th>
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Risk Tier</th>
-                  <th className="px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-800">Last Touchpoint</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
-                      No invoices match your filters.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      onClick={() => setSelectedInvoiceId(row.id)}
-                      className="cursor-pointer border-b border-slate-100 transition-colors duration-150 last:border-0 hover:bg-slate-50"
-                    >
-                      <td className="px-2 py-3">{row.isAlert && <AlertDot />}</td>
-                      <td className="px-4 py-3 text-slate-700">{row.customerName}</td>
-                      <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900">{formatFullCurrency(row.outstanding)}</td>
-                      <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${RISK_STYLES[row.riskTier]}`}>
-                          {row.riskTier}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{row.lastTouchpoint ?? "No contact yet"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-xs text-slate-400">Click any row to draft and send a collection reminder.</p>
+              <div
+                className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
+                style={{ transitionDelay: "80ms" }}
+              >
+                <DonutChart title="Invoices by Status" segments={statusDonut} animate={mounted} />
+                <DonutChart title="Outstanding by Segment" segments={segmentDonut} formatValue={formatCurrency} animate={mounted} />
+                <DonutChart
+                  title="Collections by Payment Mode"
+                  segments={paymentModeDonut}
+                  formatValue={formatCurrency}
+                  animate={mounted}
+                />
+              </div>
+
+              <div
+                className={`grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
+                style={{ transitionDelay: "160ms" }}
+              >
+                <div className="lg:col-span-2">
+                  <ChartCard title="Credit Limit vs Net Receivable — Top 5">
+                    <CreditUtilizationChart rows={creditVsReceivable} animate={mounted} />
+                  </ChartCard>
+                </div>
+                <ChartCard title="Customers by City">
+                  <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#64748b" animate={mounted} />
+                </ChartCard>
+              </div>
+            </>
+          )}
         </>
       )}
 
