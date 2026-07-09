@@ -1,11 +1,19 @@
 "use client";
 
 /*
-  This screen is intentionally self-contained: it doesn't modify any shared
+  Self-contained on purpose: this screen doesn't import or modify any shared
   component (DataTable, KpiCard, globals.css) so it can never affect how other
-  screens in this shared repo look or behave. Formatting helpers, the stat
-  tile, and the tables below are local copies/variants, not edits to the
-  shared building blocks.
+  screens in this shared repo look or behave. Every helper/table/chart below
+  is local to this file.
+
+  A few requested widgets have no backing data in this Supabase schema and we
+  never add columns/tables (CLAUDE.md rule: never touch the backend):
+    - "Collector" (assigned analyst) — no such field on customers/invoices.
+      Omitted rather than faked; would need a real column to be honest.
+    - "Dispute reason" breakdown — no dispute/reason field anywhere. Shown as
+      an explicit "not tracked yet" card instead of invented percentages.
+  "Customer Segment" (Enterprise/SMB) IS derived below from credit_limit,
+  which is a real stored field — documented at ENTERPRISE_CREDIT_LIMIT.
 */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -19,35 +27,38 @@ import {
   Percent,
   Search,
   Send,
-  ShieldAlert,
+  TrendingUp,
   X,
 } from "lucide-react";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
 import type { Customer, Invoice, ReceiptAllocation, Receipt, ReminderLog, ReminderTemplate } from "@/lib/types";
 
-type EffectiveStatus = "open" | "partial" | "overdue" | "paid";
-type StatusFilter = "all" | "open" | "partial" | "overdue";
-type Tab = "invoices" | "customers";
+type RiskTier = "High" | "Medium" | "Low";
+type Segment = "Enterprise" | "SMB";
+type RiskFilter = "all" | RiskTier;
+type DaysFilter = "all" | "1-30" | "31-60" | "61-90" | "91+";
+type SegmentFilter = "all" | Segment;
 type SendState = "idle" | "sending" | "sent" | "error";
+
+// A customer with credit_limit at/above this is treated as "Enterprise" for
+// the segment filter — a derived heuristic, not a stored field.
+const ENTERPRISE_CREDIT_LIMIT = 500000;
+// Threshold-alert rule: flag any account owing more than this AND more than
+// this many days late (mirrors the classic "big + old" collections risk).
+const ALERT_AMOUNT = 50000;
+const ALERT_DAYS = 60;
 
 interface InvoiceRow extends Invoice {
   customerName: string;
   customerEmail: string | null;
+  creditLimit: number;
+  segment: Segment;
   outstanding: number;
   daysLate: number;
-  effectiveStatus: EffectiveStatus;
-}
-
-interface CustomerSummaryRow {
-  id: string;
-  name: string;
-  code: string;
-  creditLimit: number;
-  outstanding: number;
-  invoiceCount: number;
-  worstDaysLate: number;
-  overLimit: boolean;
+  riskTier: RiskTier;
+  isAlert: boolean;
+  lastTouchpoint: string | null;
 }
 
 interface AgeingBucket {
@@ -56,11 +67,16 @@ interface AgeingBucket {
   color: string;
 }
 
-const STATUS_STYLES: Record<EffectiveStatus, string> = {
-  open: "bg-blue-50 text-blue-700",
-  partial: "bg-amber-50 text-amber-700",
-  paid: "bg-emerald-50 text-emerald-700",
-  overdue: "bg-red-50 text-red-700",
+interface WeekPoint {
+  label: string;
+  actual?: number;
+  predicted?: number;
+}
+
+const RISK_STYLES: Record<RiskTier, string> = {
+  High: "bg-red-50 text-red-700",
+  Medium: "bg-amber-50 text-amber-700",
+  Low: "bg-emerald-50 text-emerald-700",
 };
 
 const DEFAULT_TEMPLATE = {
@@ -69,11 +85,12 @@ const DEFAULT_TEMPLATE = {
 };
 
 function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  if (Math.abs(amount) >= 100000) return `₹${(amount / 100000).toFixed(2)}L`;
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
+}
+
+function formatFullCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(amount);
 }
 
 function formatDate(iso: string): string {
@@ -91,26 +108,53 @@ function daysLateFor(dueDateISO: string, asOnISO: string): number {
   return Math.floor((asOn.getTime() - due.getTime()) / 86400000);
 }
 
+function startOfWeek(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  const diffToMonday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diffToMonday);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function shortLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+function riskTierFor(daysLate: number, outstanding: number): RiskTier {
+  if (daysLate > 60 || outstanding > 100000) return "High";
+  if (daysLate > 15 || outstanding > 25000) return "Medium";
+  return "Low";
+}
+
 function fillTemplate(text: string, vars: Record<string, string>): string {
   return text.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? `{${key}}`);
 }
 
-function RiskBadge() {
+function AlertDot() {
   return (
-    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">
-      <ShieldAlert className="h-3 w-3" /> Over limit
-    </span>
+    <span
+      title={`Over ${formatFullCurrency(ALERT_AMOUNT)} and more than ${ALERT_DAYS} days late`}
+      className="inline-block h-2 w-2 flex-none rounded-full bg-red-600"
+      aria-label="Threshold alert"
+    />
   );
 }
 
 function StatCard({
   label,
   value,
+  hint,
   tone = "default",
   icon,
 }: {
   label: string;
   value: string;
+  hint?: string;
   tone?: "default" | "danger" | "success";
   icon: ReactNode;
 }) {
@@ -121,36 +165,30 @@ function StatCard({
         <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
         <span className="text-slate-300">{icon}</span>
       </div>
-      <p className={`mt-1 text-[22px] font-semibold leading-tight tabular-nums ${toneClass}`}>{value}</p>
+      <p className={`mt-1 text-2xl font-bold leading-tight tabular-nums ${toneClass}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
     </div>
   );
 }
 
-function AgeingBar({ buckets, total }: { buckets: AgeingBucket[]; total: number }) {
+function AgeingBarChart({ buckets }: { buckets: AgeingBucket[] }) {
+  const max = Math.max(1, ...buckets.map((b) => b.amount));
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <p className="mb-3 text-sm font-semibold text-slate-700">Aging Summary</p>
-      <div className="flex h-4 w-full overflow-hidden rounded-full bg-slate-100">
-        {buckets.map((b) => {
-          const pct = total > 0 ? (b.amount / total) * 100 : 0;
-          if (pct <= 0) return null;
-          return (
-            <div
-              key={b.label}
-              style={{ width: `${pct}%`, backgroundColor: b.color }}
-              title={`${b.label}: ${formatCurrency(b.amount)}`}
-            />
-          );
-        })}
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+      <p className="mb-4 text-sm font-semibold text-slate-700">AR Aging</p>
+      <div className="space-y-3">
         {buckets.map((b) => (
-          <div key={b.label} className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 flex-none rounded-full" style={{ backgroundColor: b.color }} />
-            <div>
-              <p className="text-xs text-slate-500">{b.label}</p>
-              <p className="text-sm font-semibold text-slate-900">{formatCurrency(b.amount)}</p>
+          <div key={b.label} className="flex items-center gap-3">
+            <span className="w-20 flex-none text-xs text-slate-500">{b.label}</span>
+            <div className="h-5 flex-1 overflow-hidden rounded bg-slate-100">
+              <div
+                className="h-full rounded"
+                style={{ width: `${(b.amount / max) * 100}%`, backgroundColor: b.color }}
+              />
             </div>
+            <span className="w-20 flex-none text-right text-xs font-semibold text-slate-700">
+              {formatCurrency(b.amount)}
+            </span>
           </div>
         ))}
       </div>
@@ -158,125 +196,80 @@ function AgeingBar({ buckets, total }: { buckets: AgeingBucket[]; total: number 
   );
 }
 
+function CashForecastChart({ points }: { points: WeekPoint[] }) {
+  const width = 600;
+  const height = 200;
+  const padTop = 16;
+  const padBottom = 28;
+  const max = Math.max(1, ...points.map((p) => Math.max(p.actual ?? 0, p.predicted ?? 0)));
+  const stepX = width / (points.length - 1);
+  const y = (v: number) => padTop + (1 - v / max) * (height - padTop - padBottom);
+
+  const actualPts = points.map((p, i) => (p.actual !== undefined ? `${i * stepX},${y(p.actual)}` : null)).filter(Boolean);
+  const predictedPts = points
+    .map((p, i) => (p.predicted !== undefined ? `${i * stepX},${y(p.predicted)}` : null))
+    .filter(Boolean);
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-700">Cash Forecast — Predicted vs Actual</p>
+        <div className="flex items-center gap-4 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-4 rounded bg-brand" /> Actual
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-4 rounded border-2 border-dashed border-amber-500" /> Predicted
+          </span>
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="Weekly cash forecast">
+        {actualPts.length > 1 && (
+          <polyline points={actualPts.join(" ")} fill="none" stroke="#2f6bff" strokeWidth={2.5} />
+        )}
+        {predictedPts.length > 1 && (
+          <polyline points={predictedPts.join(" ")} fill="none" stroke="#f59e0b" strokeWidth={2.5} strokeDasharray="6 4" />
+        )}
+        {points.map((p, i) => (
+          <g key={p.label}>
+            {p.actual !== undefined && <circle cx={i * stepX} cy={y(p.actual)} r={3} fill="#2f6bff" />}
+            {p.predicted !== undefined && <circle cx={i * stepX} cy={y(p.predicted)} r={3} fill="#f59e0b" />}
+            <text x={i * stepX} y={height - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
+              {p.label}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function DisputeBreakdownPlaceholder() {
+  return (
+    <div className="flex h-full flex-col rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+      <p className="text-sm font-semibold text-slate-700">Dispute Breakdown</p>
+      <p className="mt-2 flex-1 text-xs text-slate-500">
+        Not tracked yet — there&apos;s no dispute-reason field on invoices in this database, so this can&apos;t show
+        real numbers. Ask the team if invoices should carry a reason (pricing, missing PO, damaged goods) before
+        building this out; adding it means altering the schema, which this app never does on its own.
+      </p>
+    </div>
+  );
+}
+
 function SkeletonPanel() {
   return (
     <div className="animate-pulse space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="h-24 rounded-xl border border-slate-200 bg-white" />
         ))}
       </div>
-      <div className="h-24 rounded-xl border border-slate-200 bg-white" />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="h-56 rounded-xl border border-slate-200 bg-white" />
+        <div className="h-56 rounded-xl border border-slate-200 bg-white" />
+      </div>
       <div className="h-64 rounded-xl border border-slate-200 bg-white" />
-    </div>
-  );
-}
-
-function InvoiceTable({
-  rows,
-  overLimitCustomerIds,
-  onRowClick,
-}: {
-  rows: InvoiceRow[];
-  overLimitCustomerIds: Set<string>;
-  onRowClick: (row: InvoiceRow) => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left">
-            <th className="px-4 py-3 font-semibold text-slate-600">Invoice #</th>
-            <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
-            <th className="px-4 py-3 font-semibold text-slate-600">Due Date</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Amount</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Days Late</th>
-            <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
-                No invoices match your search/filter.
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => {
-              const clickable = row.effectiveStatus === "overdue";
-              return (
-                <tr
-                  key={row.id}
-                  onClick={clickable ? () => onRowClick(row) : undefined}
-                  className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${clickable ? "cursor-pointer" : ""}`}
-                >
-                  <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    <span className="inline-flex items-center">
-                      {row.customerName}
-                      {overLimitCustomerIds.has(row.customer_id) && <RiskBadge />}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{formatDate(row.due_date)}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.total)}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.outstanding)}</td>
-                  <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[row.effectiveStatus]}`}
-                    >
-                      {row.effectiveStatus}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function CustomerSummaryTable({ rows }: { rows: CustomerSummaryRow[] }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 bg-slate-50 text-left">
-            <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Credit Limit</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Invoices</th>
-            <th className="px-4 py-3 text-right font-semibold text-slate-600">Worst Days Late</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="px-4 py-10 text-center text-slate-400">
-                No customers match your search.
-              </td>
-            </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={row.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-                <td className="px-4 py-3 text-slate-700">
-                  <span className="inline-flex items-center">
-                    {row.name}
-                    {row.overLimit && <RiskBadge />}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.creditLimit)}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{formatCurrency(row.outstanding)}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{row.invoiceCount}</td>
-                <td className="px-4 py-3 text-right text-slate-700">{row.worstDaysLate > 0 ? row.worstDaysLate : "—"}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -291,9 +284,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [tab, setTab] = useState<Tab>("invoices");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [daysFilter, setDaysFilter] = useState<DaysFilter>("all");
+  const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>("all");
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -343,8 +337,6 @@ export default function DashboardPage() {
     fetchAll();
   }, [fetchAll]);
 
-  // Slide the drawer in on the frame after it mounts (Tailwind-only, no
-  // shared global keyframe needed) and back out before it unmounts.
   useEffect(() => {
     if (selectedInvoiceId) {
       const raf = requestAnimationFrame(() => setDrawerVisible(true));
@@ -361,118 +353,117 @@ export default function DashboardPage() {
     for (const a of allocations) {
       allocatedByInvoice.set(a.invoice_id, (allocatedByInvoice.get(a.invoice_id) ?? 0) + a.amount);
     }
+    const lastTouchByInvoice = new Map<string, string>();
+    for (const l of reminderLogs) {
+      if (!l.invoice_id) continue;
+      const prev = lastTouchByInvoice.get(l.invoice_id);
+      if (!prev || l.sent_at > prev) lastTouchByInvoice.set(l.invoice_id, l.sent_at);
+    }
 
     return invoices.map((inv) => {
       const customer = customerById.get(inv.customer_id);
       const outstanding = Math.max(0, inv.total - (allocatedByInvoice.get(inv.id) ?? 0));
       const rawDaysLate = daysLateFor(inv.due_date, today);
       const daysLate = outstanding > 0 ? Math.max(0, rawDaysLate) : 0;
-
-      let effectiveStatus: EffectiveStatus;
-      if (outstanding <= 0.005) effectiveStatus = "paid";
-      else if (rawDaysLate > 0) effectiveStatus = "overdue";
-      else if (inv.status === "partial") effectiveStatus = "partial";
-      else effectiveStatus = "open";
+      const creditLimit = customer?.credit_limit ?? 0;
+      const lastTouch = lastTouchByInvoice.get(inv.id) ?? null;
 
       return {
         ...inv,
         customerName: customer?.name ?? "Unknown customer",
         customerEmail: customer?.email ?? null,
+        creditLimit,
+        segment: creditLimit >= ENTERPRISE_CREDIT_LIMIT ? "Enterprise" : "SMB",
         outstanding,
         daysLate,
-        effectiveStatus,
+        riskTier: riskTierFor(daysLate, outstanding),
+        isAlert: outstanding > ALERT_AMOUNT && daysLate > ALERT_DAYS,
+        lastTouchpoint: lastTouch ? `Reminder emailed ${formatDate(lastTouch)}` : null,
       };
     });
-  }, [invoices, allocations, customerById]);
+  }, [invoices, allocations, customerById, reminderLogs]);
+
+  const openRows = useMemo(() => invoiceRows.filter((r) => r.outstanding > 0), [invoiceRows]);
 
   const stats = useMemo(() => {
-    const totalAR = invoiceRows.reduce((s, r) => (r.outstanding > 0 ? s + r.outstanding : s), 0);
-    const overdueRows = invoiceRows.filter((r) => r.effectiveStatus === "overdue");
-    const totalOverdue = overdueRows.reduce((s, r) => s + r.outstanding, 0);
-    const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
+    const today = todayISO();
+    const totalAR = openRows.reduce((s, r) => s + r.outstanding, 0);
+    const totalPastDue = openRows.reduce((s, r) => (r.daysLate > 0 ? s + r.outstanding : s), 0);
     const totalCollected = receipts.reduce((s, r) => s + r.amount, 0);
-    // Simplified CEI proxy (no period-boundary data to compute the textbook
-    // formula): share of everything invoiced that's actually been collected.
+    const totalInvoiced = invoices.reduce((s, i) => s + i.total, 0);
     const cei = totalInvoiced > 0 ? (totalCollected / totalInvoiced) * 100 : 0;
-    const avgDaysLate = overdueRows.length > 0 ? overdueRows.reduce((s, r) => s + r.daysLate, 0) / overdueRows.length : 0;
-    return { totalAR, totalOverdue, cei, avgDaysLate };
-  }, [invoiceRows, invoices, receipts]);
+
+    // DSO (count-back approximation): AR ÷ credit sales in a trailing window × window length.
+    const DSO_WINDOW_DAYS = 90;
+    const windowStart = addDays(today, -DSO_WINDOW_DAYS);
+    const salesInWindow = invoices.filter((i) => i.invoice_date >= windowStart).reduce((s, i) => s + i.total, 0);
+    const dso = salesInWindow > 0 ? (totalAR / salesInWindow) * DSO_WINDOW_DAYS : 0;
+
+    return { totalAR, totalPastDue, cei, dso, openCount: openRows.length };
+  }, [openRows, receipts, invoices]);
 
   const ageingBuckets: AgeingBucket[] = useMemo(() => {
-    const buckets = { current: 0, b1_30: 0, b31_60: 0, b61_90: 0, b91: 0 };
-    for (const r of invoiceRows) {
-      if (r.outstanding <= 0) continue;
-      if (r.daysLate <= 0) buckets.current += r.outstanding;
-      else if (r.daysLate <= 30) buckets.b1_30 += r.outstanding;
-      else if (r.daysLate <= 60) buckets.b31_60 += r.outstanding;
-      else if (r.daysLate <= 90) buckets.b61_90 += r.outstanding;
-      else buckets.b91 += r.outstanding;
+    const b = { current: 0, b1_30: 0, b31_60: 0, b61_90: 0, b91: 0 };
+    for (const r of openRows) {
+      if (r.daysLate <= 0) b.current += r.outstanding;
+      else if (r.daysLate <= 30) b.b1_30 += r.outstanding;
+      else if (r.daysLate <= 60) b.b31_60 += r.outstanding;
+      else if (r.daysLate <= 90) b.b61_90 += r.outstanding;
+      else b.b91 += r.outstanding;
     }
     return [
-      { label: "Current", amount: buckets.current, color: "#34d399" },
-      { label: "1–30 Days", amount: buckets.b1_30, color: "#fbbf24" },
-      { label: "31–60 Days", amount: buckets.b31_60, color: "#f59e0b" },
-      { label: "61–90 Days", amount: buckets.b61_90, color: "#f97316" },
-      { label: "91+ Days", amount: buckets.b91, color: "#dc2626" },
+      { label: "Current", amount: b.current, color: "#34d399" },
+      { label: "1–30", amount: b.b1_30, color: "#fbbf24" },
+      { label: "31–60", amount: b.b31_60, color: "#f59e0b" },
+      { label: "61–90", amount: b.b61_90, color: "#f97316" },
+      { label: "91+", amount: b.b91, color: "#dc2626" },
     ];
-  }, [invoiceRows]);
+  }, [openRows]);
 
-  const customerSummaryRows: CustomerSummaryRow[] = useMemo(() => {
-    const byCustomer = new Map<string, CustomerSummaryRow>();
-    for (const c of customers) {
-      byCustomer.set(c.id, {
-        id: c.id,
-        name: c.name,
-        code: c.code,
-        creditLimit: c.credit_limit,
-        outstanding: 0,
-        invoiceCount: 0,
-        worstDaysLate: 0,
-        overLimit: false,
-      });
-    }
-    for (const r of invoiceRows) {
-      if (r.outstanding <= 0) continue;
-      const row = byCustomer.get(r.customer_id);
-      if (!row) continue;
-      row.outstanding += r.outstanding;
-      row.invoiceCount += 1;
-      row.worstDaysLate = Math.max(row.worstDaysLate, r.daysLate);
-    }
-    for (const row of byCustomer.values()) {
-      row.overLimit = row.creditLimit > 0 && row.outstanding > row.creditLimit;
-    }
-    return Array.from(byCustomer.values());
-  }, [customers, invoiceRows]);
+  const cashForecast: WeekPoint[] = useMemo(() => {
+    const today = todayISO();
+    const currentWeekStart = startOfWeek(today);
+    const points: WeekPoint[] = [];
 
-  const overLimitCustomerIds = useMemo(
-    () => new Set(customerSummaryRows.filter((r) => r.overLimit).map((r) => r.id)),
-    [customerSummaryRows]
-  );
+    for (let i = 3; i >= 0; i--) {
+      const weekStart = addDays(currentWeekStart, -7 * i);
+      const weekEnd = addDays(weekStart, 6);
+      const actual = receipts
+        .filter((r) => r.receipt_date >= weekStart && r.receipt_date <= weekEnd)
+        .reduce((s, r) => s + r.amount, 0);
+      points.push({ label: shortLabel(weekStart), actual });
+    }
+    for (let i = 1; i <= 4; i++) {
+      const weekStart = addDays(currentWeekStart, 7 * i);
+      const weekEnd = addDays(weekStart, 6);
+      const predicted = openRows
+        .filter((r) => r.due_date >= weekStart && r.due_date <= weekEnd)
+        .reduce((s, r) => s + r.outstanding, 0);
+      points.push({ label: shortLabel(weekStart), predicted });
+    }
+    return points;
+  }, [receipts, openRows]);
 
-  const filteredInvoiceRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = invoiceRows.filter((r) => {
+    const filtered = openRows.filter((r) => {
       if (q && !r.customerName.toLowerCase().includes(q)) return false;
-      if (statusFilter !== "all" && r.effectiveStatus !== statusFilter) return false;
+      if (riskFilter !== "all" && r.riskTier !== riskFilter) return false;
+      if (segmentFilter !== "all" && r.segment !== segmentFilter) return false;
+      if (daysFilter === "1-30" && !(r.daysLate >= 1 && r.daysLate <= 30)) return false;
+      if (daysFilter === "31-60" && !(r.daysLate >= 31 && r.daysLate <= 60)) return false;
+      if (daysFilter === "61-90" && !(r.daysLate >= 61 && r.daysLate <= 90)) return false;
+      if (daysFilter === "91+" && !(r.daysLate >= 91)) return false;
       return true;
     });
-    return [...filtered].sort((a, b) => b.daysLate - a.daysLate || b.invoice_date.localeCompare(a.invoice_date));
-  }, [invoiceRows, search, statusFilter]);
-
-  const filteredCustomerRows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = customerSummaryRows.filter((r) => !q || r.name.toLowerCase().includes(q));
-    return [...filtered].sort((a, b) => b.outstanding - a.outstanding);
-  }, [customerSummaryRows, search]);
+    return [...filtered].sort((a, b) => b.daysLate - a.daysLate || b.outstanding - a.outstanding);
+  }, [openRows, search, riskFilter, segmentFilter, daysFilter]);
 
   const selectedInvoice = useMemo(
     () => invoiceRows.find((r) => r.id === selectedInvoiceId) ?? null,
     [invoiceRows, selectedInvoiceId]
   );
-
   const template = templates[0] ?? null;
-
   const lastSentForSelected = useMemo(() => {
     if (!selectedInvoice) return null;
     const logs = reminderLogs
@@ -487,12 +478,10 @@ export default function DashboardPage() {
   }
 
   async function handleSend() {
-    if (!supabase || !selectedInvoice) return;
-    if (!selectedInvoice.customerEmail) return;
-
+    if (!supabase || !selectedInvoice || !selectedInvoice.customerEmail) return;
     const vars = {
       customer: selectedInvoice.customerName,
-      amount: formatCurrency(selectedInvoice.outstanding),
+      amount: formatFullCurrency(selectedInvoice.outstanding),
       days_overdue: String(selectedInvoice.daysLate),
       invoice_no: selectedInvoice.invoice_no,
     };
@@ -500,7 +489,6 @@ export default function DashboardPage() {
     const body = fillTemplate(template?.body ?? DEFAULT_TEMPLATE.body, vars);
 
     setSendState((s) => ({ ...s, [selectedInvoice.id]: "sending" }));
-
     const { data, error: sendError } = await supabase
       .from("reminder_log")
       .insert({
@@ -518,7 +506,6 @@ export default function DashboardPage() {
       setSendState((s) => ({ ...s, [selectedInvoice.id]: "error" }));
       return;
     }
-
     setReminderLogs((logs) => [...logs, data as ReminderLog]);
     setSendState((s) => ({ ...s, [selectedInvoice.id]: "sent" }));
   }
@@ -527,7 +514,7 @@ export default function DashboardPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">AR Analyst Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">Who owes us money, how late it is, and one click to chase it.</p>
+        <p className="mt-1 text-sm text-slate-500">Cash flow health, aging risk, and a worklist to chase it.</p>
       </div>
 
       {!isConfigured && <NotConfigured />}
@@ -543,48 +530,43 @@ export default function DashboardPage() {
 
       {isConfigured && !loading && !error && (
         <>
-          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Total AR" value={formatCurrency(stats.totalAR)} icon={<IndianRupee className="h-4 w-4" />} />
+          <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <StatCard label="Total AR Outstanding" value={formatFullCurrency(stats.totalAR)} icon={<IndianRupee className="h-4 w-4" />} />
             <StatCard
-              label="Total Overdue"
-              value={formatCurrency(stats.totalOverdue)}
-              tone={stats.totalOverdue > 0 ? "danger" : "default"}
-              icon={<AlertTriangle className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Collection Efficiency (CEI)"
-              value={`${stats.cei.toFixed(1)}%`}
-              tone="success"
-              icon={<Percent className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Average Days Late"
-              value={stats.avgDaysLate > 0 ? `${Math.round(stats.avgDaysLate)} days` : "—"}
+              label="Days Sales Outstanding"
+              value={`${stats.dso.toFixed(0)} days`}
+              hint={stats.dso <= 45 ? "Within standard (≤45)" : "Above standard (45)"}
+              tone={stats.dso > 45 ? "danger" : "success"}
               icon={<Clock className="h-4 w-4" />}
             />
+            <StatCard
+              label="Total Past Due"
+              value={formatFullCurrency(stats.totalPastDue)}
+              tone={stats.totalPastDue > 0 ? "danger" : "default"}
+              icon={<AlertTriangle className="h-4 w-4" />}
+            />
+            <StatCard label="Collection Effectiveness (CEI)" value={`${stats.cei.toFixed(1)}%`} tone="success" icon={<Percent className="h-4 w-4" />} />
+            <StatCard label="Open Invoices" value={String(stats.openCount)} icon={<TrendingUp className="h-4 w-4" />} />
           </div>
 
-          <div className="mb-6">
-            <AgeingBar buckets={ageingBuckets} total={stats.totalAR} />
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <AgeingBarChart buckets={ageingBuckets} />
+            <CashForecastChart points={cashForecast} />
+          </div>
+
+          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5">
+              <p className="mb-1 text-sm font-semibold text-slate-700">Reading the aging chart</p>
+              <p className="text-xs text-slate-500">
+                {formatFullCurrency(ageingBuckets[4].amount)} sits in the 91+ day bucket — that&apos;s the collection-risk
+                money. Rows flagged <AlertDot /> below cross both size ({formatFullCurrency(ALERT_AMOUNT)}+) and age (
+                {ALERT_DAYS}+ days) thresholds and need attention first.
+              </p>
+            </div>
+            <DisputeBreakdownPlaceholder />
           </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="inline-flex rounded-lg bg-slate-100 p-1 text-sm font-medium">
-              {(["invoices", "customers"] as Tab[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  aria-pressed={tab === t}
-                  onClick={() => setTab(t)}
-                  className={`rounded-md px-3 py-1.5 transition-colors ${
-                    tab === t ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {t === "invoices" ? "All Invoices" : "Customer Summary"}
-                </button>
-              ))}
-            </div>
-
             <div className="relative min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -594,33 +576,84 @@ export default function DashboardPage() {
                 className="w-full rounded-lg border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
-
-            {tab === "invoices" && (
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-              >
-                <option value="all">All statuses</option>
-                <option value="open">Open</option>
-                <option value="partial">Partial</option>
-                <option value="overdue">Overdue</option>
-              </select>
-            )}
+            <select
+              value={riskFilter}
+              onChange={(e) => setRiskFilter(e.target.value as RiskFilter)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            >
+              <option value="all">All risk tiers</option>
+              <option value="High">High risk</option>
+              <option value="Medium">Medium risk</option>
+              <option value="Low">Low risk</option>
+            </select>
+            <select
+              value={daysFilter}
+              onChange={(e) => setDaysFilter(e.target.value as DaysFilter)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+            >
+              <option value="all">Any days past due</option>
+              <option value="1-30">1–30 days</option>
+              <option value="31-60">31–60 days</option>
+              <option value="61-90">61–90 days</option>
+              <option value="91+">91+ days</option>
+            </select>
+            <select
+              value={segmentFilter}
+              onChange={(e) => setSegmentFilter(e.target.value as SegmentFilter)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+              title={`Derived from credit limit — Enterprise means credit limit ≥ ${formatFullCurrency(ENTERPRISE_CREDIT_LIMIT)}`}
+            >
+              <option value="all">All segments</option>
+              <option value="Enterprise">Enterprise</option>
+              <option value="SMB">SMB</option>
+            </select>
           </div>
 
-          {tab === "invoices" ? (
-            <InvoiceTable
-              rows={filteredInvoiceRows}
-              overLimitCustomerIds={overLimitCustomerIds}
-              onRowClick={(row) => setSelectedInvoiceId(row.id)}
-            />
-          ) : (
-            <CustomerSummaryTable rows={filteredCustomerRows} />
-          )}
-          {tab === "invoices" && (
-            <p className="mt-2 text-xs text-slate-400">Click an overdue row to draft a collection reminder.</p>
-          )}
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                  <th className="w-6 px-2 py-3" />
+                  <th className="px-4 py-3 font-semibold text-slate-600">Customer</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Invoice #</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-600">Amount Owed</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-600">Days Past Due</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Risk Tier</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Last Touchpoint</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                      No invoices match your filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr
+                      key={row.id}
+                      onClick={() => setSelectedInvoiceId(row.id)}
+                      className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    >
+                      <td className="px-2 py-3">{row.isAlert && <AlertDot />}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.customerName}</td>
+                      <td className="px-4 py-3 text-slate-700">{row.invoice_no}</td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900">{formatFullCurrency(row.outstanding)}</td>
+                      <td className="px-4 py-3 text-right text-slate-700">{row.daysLate > 0 ? row.daysLate : "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${RISK_STYLES[row.riskTier]}`}>
+                          {row.riskTier}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-500">{row.lastTouchpoint ?? "No contact yet"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Click any row to draft and send a collection reminder.</p>
         </>
       )}
 
@@ -641,12 +674,7 @@ export default function DashboardPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-brand">Collection Reminder</p>
                 <h2 className="text-lg font-bold text-slate-900">{selectedInvoice.invoice_no}</h2>
               </div>
-              <button
-                type="button"
-                onClick={closeDrawer}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Close"
-              >
+              <button type="button" onClick={closeDrawer} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -659,17 +687,21 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Outstanding</p>
-                  <p className="font-medium text-slate-900">{formatCurrency(selectedInvoice.outstanding)}</p>
+                  <p className="font-medium text-slate-900">{formatFullCurrency(selectedInvoice.outstanding)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Days Overdue</p>
                   <p className="font-medium text-red-600">{selectedInvoice.daysLate} days</p>
                 </div>
                 <div>
+                  <p className="text-xs text-slate-500">Risk Tier</p>
+                  <span className={`inline-block w-fit rounded-full px-2 py-0.5 text-xs font-medium ${RISK_STYLES[selectedInvoice.riskTier]}`}>
+                    {selectedInvoice.riskTier}
+                  </span>
+                </div>
+                <div className="col-span-2">
                   <p className="text-xs text-slate-500">Last Reminder</p>
-                  <p className="font-medium text-slate-900">
-                    {lastSentForSelected ? formatDate(lastSentForSelected.sent_at) : "Never sent"}
-                  </p>
+                  <p className="font-medium text-slate-900">{lastSentForSelected ? formatDate(lastSentForSelected.sent_at) : "Never sent"}</p>
                 </div>
               </div>
 
@@ -685,7 +717,7 @@ export default function DashboardPage() {
                   <p className="mb-2 font-semibold text-slate-900">
                     {fillTemplate(template?.subject ?? DEFAULT_TEMPLATE.subject, {
                       customer: selectedInvoice.customerName,
-                      amount: formatCurrency(selectedInvoice.outstanding),
+                      amount: formatFullCurrency(selectedInvoice.outstanding),
                       days_overdue: String(selectedInvoice.daysLate),
                       invoice_no: selectedInvoice.invoice_no,
                     })}
@@ -693,7 +725,7 @@ export default function DashboardPage() {
                   <p className="whitespace-pre-wrap text-slate-700">
                     {fillTemplate(template?.body ?? DEFAULT_TEMPLATE.body, {
                       customer: selectedInvoice.customerName,
-                      amount: formatCurrency(selectedInvoice.outstanding),
+                      amount: formatFullCurrency(selectedInvoice.outstanding),
                       days_overdue: String(selectedInvoice.daysLate),
                       invoice_no: selectedInvoice.invoice_no,
                     })}
@@ -721,9 +753,7 @@ export default function DashboardPage() {
                       {(state === "idle" || state === "error") && <Send className="h-4 w-4" />}
                       {state === "sending" ? "Sending…" : state === "sent" ? "Sent" : "Send Reminder"}
                     </button>
-                    {state === "error" && (
-                      <p className="mt-2 text-center text-xs text-red-600">Couldn&apos;t send. Try again.</p>
-                    )}
+                    {state === "error" && <p className="mt-2 text-center text-xs text-red-600">Couldn&apos;t send. Try again.</p>}
                   </>
                 );
               })()}
