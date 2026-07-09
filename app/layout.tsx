@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthGate } from "@/components/auth/AuthGate";
+import { ToastProvider } from "@/components/Toast";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className={inter.className}>
-        <AuthGate>{children}</AuthGate>
+        <ToastProvider>
+          <AuthGate>{children}</AuthGate>
+        </ToastProvider>
       </body>
     </html>
   );
