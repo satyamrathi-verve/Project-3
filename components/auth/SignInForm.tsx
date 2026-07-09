@@ -149,9 +149,9 @@ export function SignInForm({ onSuccess }: { onSuccess: (session: Session) => voi
         <div className="mb-6 flex flex-col items-center text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/verve-logo.png" alt="Verve Advisory" className="h-16 w-auto" />
-          <AR360Logo className="mt-[1cm] h-10" />
-          <p className="mt-[1cm] text-xs font-medium text-slate-500">(360° AR management)</p>
-          <p className="mt-[1cm] text-sm text-slate-500">Welcome back. Sign in to continue.</p>
+          <AR360Logo className="mt-3 h-10" />
+          <p className="mt-1 text-xs text-slate-500">(360° AR management)</p>
+          <p className="mt-3 text-sm text-slate-500">Welcome back. Sign in to continue.</p>
         </div>
 
         <form onSubmit={handleSubmit} noValidate>
