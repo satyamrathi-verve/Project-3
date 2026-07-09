@@ -24,6 +24,7 @@
 */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   BarChart3,
@@ -64,6 +65,21 @@ const ENTERPRISE_CREDIT_LIMIT = 500000;
 const ALERT_AMOUNT = 50000;
 const ALERT_DAYS = 60;
 
+// Quick-jump shortcuts to the other built screens — every link below points
+// at a route that already exists in this repo (checked against the team's
+// commits before adding this list, nothing speculative here).
+const QUICK_LINKS: { href: string; label: string }[] = [
+  { href: "/reports/ageing", label: "AR Ageing" },
+  { href: "/reports/statement", label: "Customer Statement" },
+  { href: "/cashflow", label: "Cashflow Projection" },
+  { href: "/invoices", label: "Invoices" },
+  { href: "/receipts", label: "Receipts" },
+  { href: "/reminders", label: "Reminder Template" },
+  { href: "/reminders/auto-shoot", label: "Auto Email Shoot" },
+  { href: "/masters/customers", label: "Customer Master" },
+  { href: "/masters/gl", label: "GL Master" },
+];
+
 interface InvoiceRow extends Invoice {
   customerName: string;
   customerEmail: string | null;
@@ -102,6 +118,12 @@ interface RankedItem {
 interface MonthPoint {
   label: string;
   amount: number;
+}
+
+interface CreditRow {
+  name: string;
+  creditLimit: number;
+  outstanding: number;
 }
 
 const RISK_STYLES: Record<RiskTier, string> = {
@@ -154,6 +176,13 @@ function addDays(iso: string, days: number): string {
 
 function shortLabel(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+// Last calendar day of a "YYYY-MM" month key, as an ISO date string.
+function endOfMonth(yearMonthKey: string): string {
+  const [y, m] = yearMonthKey.split("-").map(Number);
+  const d = new Date(y, m, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 function riskTierFor(daysLate: number, outstanding: number): RiskTier {
@@ -452,6 +481,92 @@ function MonthlyTrendChart({ points, animate }: { points: MonthPoint[]; animate:
   );
 }
 
+// Distinct from RankedBarList on purpose: each row overlays the *outstanding*
+// fill on top of a *credit limit* track on a shared scale, so a bar visibly
+// blowing past its own track reads instantly as "over limit" — a comparison
+// a single-value bar list can't show.
+function CreditUtilizationChart({ rows, animate }: { rows: CreditRow[]; animate: boolean }) {
+  const max = Math.max(1, ...rows.map((r) => Math.max(r.creditLimit, r.outstanding)));
+  if (rows.length === 0) return <p className="text-xs text-slate-400">No data yet.</p>;
+  return (
+    <div className="space-y-4">
+      {rows.map((r, i) => {
+        const pct = r.creditLimit > 0 ? (r.outstanding / r.creditLimit) * 100 : 0;
+        const barColor = pct > 100 ? "#dc2626" : pct > 75 ? "#f59e0b" : ACCENT;
+        return (
+          <div key={r.name}>
+            <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+              <span className="truncate font-semibold text-slate-700" title={r.name}>
+                {r.name}
+              </span>
+              <span className={`flex-none font-bold ${pct > 100 ? "text-red-600" : "text-slate-500"}`}>
+                {pct.toFixed(0)}% of limit
+              </span>
+            </div>
+            <div className="relative h-6 overflow-hidden rounded-full bg-slate-100">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full border-2 border-slate-300 transition-[width] duration-700 ease-out"
+                style={{
+                  width: `${animate ? (r.creditLimit / max) * 100 : 0}%`,
+                  transitionDelay: `${i * 90}ms`,
+                }}
+              />
+              <div
+                className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out"
+                style={{
+                  width: `${animate ? (r.outstanding / max) * 100 : 0}%`,
+                  backgroundColor: barColor,
+                  transitionDelay: `${i * 90 + 120}ms`,
+                }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+              <span>Net receivable: {formatCurrency(r.outstanding)}</span>
+              <span>Credit limit: {formatCurrency(r.creditLimit)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function AreaTrendChart({ points, animate, color = ACCENT }: { points: MonthPoint[]; animate: boolean; color?: string }) {
+  const width = 600;
+  const height = 180;
+  const padTop = 16;
+  const padBottom = 28;
+  const max = Math.max(1, ...points.map((p) => p.amount));
+  const stepX = points.length > 1 ? width / (points.length - 1) : width;
+  const y = (v: number) => padTop + (1 - v / max) * (height - padTop - padBottom);
+  const linePts = points.map((p, i) => `${i * stepX},${y(p.amount)}`).join(" ");
+  const areaPts = `0,${height - padBottom} ${linePts} ${width},${height - padBottom}`;
+  const pathLength = width * 1.3;
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="AR outstanding trend">
+      <polygon points={areaPts} fill={color} style={{ opacity: animate ? 0.12 : 0, transition: "opacity 700ms ease-out 300ms" }} />
+      <polyline
+        points={linePts}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray={pathLength}
+        strokeDashoffset={animate ? 0 : pathLength}
+        style={{ transition: "stroke-dashoffset 900ms ease-out" }}
+      />
+      {points.map((p, i) => (
+        <g key={p.label} style={{ opacity: animate ? 1 : 0, transition: `opacity 400ms ease-out ${500 + i * 60}ms` }}>
+          <circle cx={i * stepX} cy={y(p.amount)} r={3} fill={color} />
+          <text x={i * stepX} y={height - 6} fontSize={10} textAnchor="middle" fill="#94a3b8">
+            {p.label}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 function SkeletonPanel() {
   return (
     <div className="animate-pulse space-y-4">
@@ -729,14 +844,54 @@ export default function DashboardPage() {
       .slice(0, 8);
   }, [customers]);
 
-  const topCustomersByOutstanding: RankedItem[] = useMemo(() => {
-    const byCustomer = new Map<string, number>();
-    for (const r of openRows) byCustomer.set(r.customerName, (byCustomer.get(r.customerName) ?? 0) + r.outstanding);
-    return Array.from(byCustomer.entries())
-      .map(([label, value]) => ({ label, value: Math.round(value) }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+  const creditVsReceivable: CreditRow[] = useMemo(() => {
+    const byCustomer = new Map<string, CreditRow>();
+    for (const r of openRows) {
+      const existing = byCustomer.get(r.customer_id);
+      if (existing) existing.outstanding += r.outstanding;
+      else byCustomer.set(r.customer_id, { name: r.customerName, creditLimit: r.creditLimit, outstanding: r.outstanding });
+    }
+    return Array.from(byCustomer.values())
+      .sort((a, b) => b.outstanding - a.outstanding)
+      .slice(0, 5)
+      .map((c) => ({ ...c, outstanding: Math.round(c.outstanding) }));
   }, [openRows]);
+
+  // Month-end AR balance, reconstructed from invoice dates + when each
+  // receipt allocation actually landed — not just "invoiced per month" (that
+  // ignores collections), this is what's still owed as of each month-end.
+  const arOutstandingTrend: MonthPoint[] = useMemo(() => {
+    const receiptDateById = new Map(receipts.map((r) => [r.id, r.receipt_date]));
+    const monthKeys = Array.from(new Set(invoices.map((i) => i.invoice_date.slice(0, 7))))
+      .sort()
+      .slice(-6);
+    const today = todayISO();
+
+    return monthKeys.map((key) => {
+      const monthEnd = endOfMonth(key);
+      const asOf = monthEnd > today ? today : monthEnd;
+      let outstanding = 0;
+      for (const inv of invoices) {
+        if (inv.invoice_date > asOf) continue;
+        const allocated = allocations.reduce((s, a) => {
+          if (a.invoice_id !== inv.id) return s;
+          const receiptDate = receiptDateById.get(a.receipt_id);
+          return receiptDate && receiptDate <= asOf ? s + a.amount : s;
+        }, 0);
+        outstanding += Math.max(0, inv.total - allocated);
+      }
+      return {
+        label: new Date(`${key}-01T00:00:00`).toLocaleDateString("en-IN", { month: "short" }),
+        amount: Math.round(outstanding),
+      };
+    });
+  }, [invoices, allocations, receipts]);
+
+  const uncontactedOverdueCount = useMemo(
+    () => openRows.filter((r) => r.daysLate > 0 && !r.lastTouchpoint).length,
+    [openRows]
+  );
+  const overdueCount = useMemo(() => openRows.filter((r) => r.daysLate > 0).length, [openRows]);
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -835,6 +990,18 @@ export default function DashboardPage() {
         )}
       </div>
 
+      <div className="mb-6 flex flex-wrap gap-2">
+        {QUICK_LINKS.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            className="rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 shadow-sm transition-colors hover:bg-orange-100"
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
+
       {!isConfigured && <NotConfigured />}
 
       {isConfigured && error && (
@@ -908,23 +1075,49 @@ export default function DashboardPage() {
           </div>
 
           <div
-            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "240ms" }}
+            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-2 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "220ms" }}
           >
+            <ChartCard title="AR Outstanding Trend (month-end balance)">
+              <AreaTrendChart points={arOutstandingTrend} animate={mounted} />
+            </ChartCard>
             <ChartCard title="Monthly Invoiced Trend">
               <MonthlyTrendChart points={monthlyTrend} animate={mounted} />
             </ChartCard>
-            <ChartCard title="Top 5 Customers by Outstanding">
-              <RankedBarList items={topCustomersByOutstanding} formatValue={formatCurrency} color={ACCENT} animate={mounted} />
-            </ChartCard>
+          </div>
+
+          <div
+            className={`mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3 ${revealClass(mounted)}`}
+            style={{ transitionDelay: "280ms" }}
+          >
+            <div className="lg:col-span-2">
+              <ChartCard title="Credit Limit vs Net Receivable — Top 5">
+                <CreditUtilizationChart rows={creditVsReceivable} animate={mounted} />
+              </ChartCard>
+            </div>
             <ChartCard title="Customers by City">
               <RankedBarList items={cityBreakdown} formatValue={(v) => String(v)} color="#64748b" animate={mounted} />
             </ChartCard>
           </div>
 
+          {uncontactedOverdueCount > 0 && (
+            <div
+              className={`mb-4 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 ${revealClass(
+                mounted
+              )}`}
+              style={{ transitionDelay: "340ms" }}
+            >
+              <AlertTriangle className="h-4 w-4 flex-none" />
+              <span>
+                <strong>{uncontactedOverdueCount}</strong> of {overdueCount} overdue invoices have never received a
+                reminder — these need outreach first.
+              </span>
+            </div>
+          )}
+
           <div
             className={`mb-4 flex flex-wrap items-center gap-3 ${revealClass(mounted)}`}
-            style={{ transitionDelay: "320ms" }}
+            style={{ transitionDelay: "360ms" }}
           >
             <div className="relative min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
